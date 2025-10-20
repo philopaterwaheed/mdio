@@ -5,10 +5,30 @@
     <link rel="stylesheet" href="styles.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>mdio</title>
-    <script type="module" src="/main.js" defer></script>
+    <script src="/main.js" defer></script>
   </head>
 
   <body>
+    <div class="container">
+      <h1>Markdown File Parser</h1>
+      
+      <div class="input-section">
+        <label for="file-input">File Path:</label>
+        <div class="input-group">
+          <input 
+            id="file-input" 
+            type="text" 
+            placeholder="Enter file path (e.g., /path/to/file.md)"
+          />
+          <button id="parse-button">Parse File</button>
+        </div>
+        <p class="hint">You can also pass a file path as a command line argument when starting the app</p>
+        <p id="file-path-display" class="file-display"></p>
+      </div>
 
+      <div id="output" class="output">
+        <p class="placeholder">Enter a markdown file path above to parse and render it</p>
+      </div>
+    </div>
   </body>
 </html>
