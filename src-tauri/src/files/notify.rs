@@ -24,4 +24,3 @@ pub fn watch_files(app_handle: tauri::AppHandle, paths: Vec<&str>) -> Result<()>
 
     Ok(())
 }
-

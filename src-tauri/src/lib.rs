@@ -1,6 +1,6 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 mod types;
-mod notify;
+mod files;
 
 use types::{CurruntFile, FileState};
 use pulldown_cmark::{html, Options, Parser};
@@ -50,15 +50,15 @@ fn parse_file(
             let contents = fs::read_to_string(&path)
                 .map_err(|e| format!("Failed to read file '{}': {}", path, e))?;
             let html = render_markdown(contents);
-            println!("html: {}", html);
             return Ok(html);
         }
     } else {
-        let path = state.path.as_ref().unwrap().clone();
+
+        let path = file_path.as_ref().unwrap();
         let contents = fs::read_to_string(&path)
             .map_err(|e| format!("Failed to read file '{}': {}", path, e))?;
         let html = render_markdown(contents);
-        println!("html: {}", html);
+        println!("got here");
         return Ok(html);
     }
 }
@@ -67,7 +67,7 @@ fn parse_file(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![render_markdown, parse_file])
+        .invoke_handler(tauri::generate_handler![render_markdown, parse_file, add_file, files::search::start_live_fuzzy_search ,files::search::cancel_fuzzy_search, list_files])
         .manage(FileState::new())
         .setup(|app| {
             let args: Vec<String> = std::env::args().collect();
