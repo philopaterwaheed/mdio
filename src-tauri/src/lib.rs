@@ -1,10 +1,10 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-use pulldown_cmark::{Parser, Options, html};
+mod types;
 
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
+use types::CurruntFile;
+use pulldown_cmark::{html, Options, Parser};
+use std::fs;
+use tauri::Manager;
 
 #[tauri::command]
 fn render_markdown(markdown: String) -> String {
@@ -21,11 +21,51 @@ fn render_markdown(markdown: String) -> String {
     html_output
 }
 
+#[tauri::command]
+fn parse_file(
+    state: tauri::State<CurruntFile>,
+    file_path: Option<String>,
+) -> Result<String, String> {
+    if file_path.is_none() {
+        if state.path.is_none() {
+            return Err("No file path provided".into());
+        } else {
+            let path = state.path.as_ref().unwrap().clone();
+            let contents = fs::read_to_string(&path)
+                .map_err(|e| format!("Failed to read file '{}': {}", path, e))?;
+            let html = render_markdown(contents);
+            println!("html: {}", html);
+            return Ok(html);
+        }
+    } else {
+        let path = state.path.as_ref().unwrap().clone();
+        let contents = fs::read_to_string(&path)
+            .map_err(|e| format!("Failed to read file '{}': {}", path, e))?;
+        let html = render_markdown(contents);
+        println!("html: {}", html);
+        return Ok(html);
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet,render_markdown])
+        .invoke_handler(tauri::generate_handler![render_markdown, parse_file])
+        .setup(|app| {
+            let args: Vec<String> = std::env::args().collect();
+            if args.len() > 1 {
+                let file_path = &args[1];
+                println!("Received file argument: {}", file_path);
+                app.manage(CurruntFile {
+                    path: Some(file_path.clone()),
+                });
+            } else {
+                app.manage(CurruntFile { path: None });
+            }
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+
