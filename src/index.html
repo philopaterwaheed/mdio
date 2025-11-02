@@ -5,7 +5,7 @@
     <link rel="stylesheet" href="styles.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>mdio</title>
-    <script src="/main.js" defer></script>
+    <script type="module" src="/main.js"></script>
   </head>
 
   <body>
@@ -13,6 +13,12 @@
 	  <input type="text" id="searchInput" placeholder="Type to search..." />
 	    <div id="searchResults" class="results"></div>
      </div>
+     
+     <div id="themePopup" class="popup">
+	  <input type="text" id="themeInput" placeholder="Search themes..." />
+	    <div id="themeResults" class="results"></div>
+     </div>
+     
     <div class="container">
       <div id="output" class="output">
       </div>

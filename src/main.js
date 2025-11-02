@@ -1,3 +1,5 @@
+import { themes, applyTheme, loadSavedTheme, getCurrentTheme } from './themes/themes.js';
+
 const { listen } = window.__TAURI__.event;
 const { invoke } = window.__TAURI__.core;
 
@@ -8,17 +10,24 @@ const searchPopup = document.getElementById("searchPopup");
 const searchInput = document.getElementById("searchInput");
 const closeBtn = document.getElementById("closeBtn");
 
+const themePopup = document.getElementById("themePopup");
+const themeInput = document.getElementById("themeInput");
+const themeResultsEl = document.getElementById("themeResults");
+
 let leaderActive = false;
 let leaderTimeout;
 let results = [];
 let selectedIndex = -1;
+
+let themeResults = [];
+let themeSelectedIndex = -1;
 
 function openPopup() {
   searchPopup.style.display = "block";
   searchInput.focus();
 }
 
-function closePopup() {
+window.closePopup = function () {
   searchPopup.style.display = "none";
   searchInput.value = "";
   searchResultsEl.innerHTML = "";
@@ -28,7 +37,67 @@ function closePopup() {
   invoke("cancel_fuzzy_search");
 }
 
-async function parseFile(filePath) {
+function openThemePopup() {
+  themePopup.style.display = "block";
+  themeInput.focus();
+  renderThemes("");
+}
+
+function closeThemePopup() {
+  themePopup.style.display = "none";
+  themeInput.value = "";
+  themeResultsEl.innerHTML = "";
+  themeResults = [];
+  themeSelectedIndex = -1;
+  leaderActive = false;
+}
+
+function renderThemes(query) {
+  const currentTheme = getCurrentTheme();
+  const lowerQuery = query.toLowerCase();
+  
+  themeResults = Object.entries(themes)
+    .filter(([id, theme]) => 
+      theme.name.toLowerCase().includes(lowerQuery) ||
+      id.toLowerCase().includes(lowerQuery)
+    )
+    .map(([id, theme]) => ({ id, ...theme }));
+  
+  themeResultsEl.innerHTML = themeResults
+    .map((theme, index) => `
+      <div class="result-item theme-item ${theme.id === currentTheme ? 'current-theme' : ''}" data-theme-id="${theme.id}">
+        <div class="box" onclick="selectTheme('${theme.id}')">
+          <span class="filename">${theme.name} ${theme.id === currentTheme ? '✓' : ''}</span>
+          <small class="path">${theme.id}</small>
+        </div>
+      </div>
+    `)
+    .join("");
+  
+  if (themeSelectedIndex >= themeResults.length) {
+    themeSelectedIndex = themeResults.length > 0 ? 0 : -1;
+  }
+  updateThemeSelection();
+}
+
+function updateThemeSelection() {
+  const boxes = themeResultsEl.querySelectorAll(".result-item");
+  boxes.forEach((box, index) => {
+    if (index === themeSelectedIndex) {
+      box.classList.add("selected");
+      box.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    } else {
+      box.classList.remove("selected");
+    }
+  });
+}
+
+window.selectTheme = function(themeId) {
+  applyTheme(themeId);
+  closeThemePopup();
+};
+
+window.parseFile = async function (filePath) {
   try {
     console.log("parsing");
     outputEl.innerHTML = "<p>Parsing file...</p>";
@@ -92,6 +161,28 @@ window.addEventListener("keydown", (e) => {
     const path = selected.dataset.path;
     closePopup();
     parseFile(path);
+  }
+});
+
+window.addEventListener("keydown", (e) => {
+  if (themePopup.style.display !== "block") return;
+
+  const boxes = themeResultsEl.querySelectorAll(".result-item");
+  if (boxes.length === 0) return;
+
+  if (e.key === "ArrowDown") {
+    e.preventDefault();
+    themeSelectedIndex = (themeSelectedIndex + 1) % boxes.length;
+    updateThemeSelection();
+  } else if (e.key === "ArrowUp") {
+    e.preventDefault();
+    themeSelectedIndex = (themeSelectedIndex - 1 + boxes.length) % boxes.length;
+    updateThemeSelection();
+  } else if (e.key === "Enter" && themeSelectedIndex >= 0) {
+    e.preventDefault();
+    const selected = boxes[themeSelectedIndex];
+    const themeId = selected.dataset.themeId;
+    selectTheme(themeId);
   }
 });
 
@@ -190,14 +281,32 @@ async function onSearchInput(e) {
 
 window.addEventListener("DOMContentLoaded", () => {
   outputEl = document.querySelector("#output");
+  
+  // Load saved theme
+  loadSavedTheme();
+  
   parseFile();
   searchInput.addEventListener("input", onSearchInput);
+  themeInput.addEventListener("input", (e) => {
+    renderThemes(e.target.value);
+    themeSelectedIndex = 0;
+    updateThemeSelection();
+  });
   
   // Leader key logic
   window.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") return closePopup();
+    if (e.key === "Escape") {
+      if (searchPopup.style.display === "block") {
+        closePopup();
+        return;
+      }
+      if (themePopup.style.display === "block") {
+        closeThemePopup();
+        return;
+      }
+    }
 
-    if (searchPopup.style.display === "block") return;
+    if (searchPopup.style.display === "block" || themePopup.style.display === "block") return;
 
     if (!leaderActive && e.key === " ") {
       leaderActive = true;
@@ -212,6 +321,8 @@ window.addEventListener("DOMContentLoaded", () => {
       e.preventDefault(); // prevent this key from typing in input
       if (e.key.toLowerCase() === "f") {
         openPopup();
+      } else if (e.key.toLowerCase() === "t") {
+        openThemePopup();
       }
       leaderActive = false;
       clearTimeout(leaderTimeout);
