@@ -337,3 +337,30 @@ h1 {
   border-color: var(--accent-border);
   background-color: var(--bg-hover);
 }
+
+/* Syntax highlighting enhancements */
+.output pre code.hljs {
+  display: block;
+  overflow-x: auto;
+  padding: 1em;
+  background: var(--code-bg);
+}
+
+.output code.hljs {
+  padding: 3px 5px;
+}
+
+.output pre {
+  margin: 1em 0;
+}
+
+.hljs {
+  background: var(--code-bg) !important;
+  color: var(--text-primary) !important;
+}
+
+.output pre code {
+  font-family: 'Courier New', Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+  font-size: 0.9em;
+  line-height: 1.5;
+}

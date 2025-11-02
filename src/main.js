@@ -103,6 +103,9 @@ window.parseFile = async function (filePath) {
     outputEl.innerHTML = "<p>Parsing file...</p>";
     const result = await invoke("parse_file", { filePath });
     outputEl.innerHTML = result;
+    outputEl.querySelectorAll('pre code').forEach((block) => {
+      hljs.highlightElement(block);
+    });
     console.log(outputEl.innerHTML)
   } catch (error) {
     outputEl.innerHTML = `<p style="color: red;">Error: ${error}</p>`;
