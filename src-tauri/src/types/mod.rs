@@ -47,3 +47,12 @@ impl PartialOrd for SearchResult {
         Some(self.cmp(other))
     }
 }
+
+pub struct WatcherState {
+    pub current_path: Arc<Mutex<Option<String>>>,
+}
+
+#[derive(Default)]
+pub struct Patch {
+    pub path: Option<String>,
+}
