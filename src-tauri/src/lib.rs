@@ -100,6 +100,7 @@ pub fn run() {
         .setup(|app| {
             let watcher = FileWatcher::new(app.handle().clone())?;
             app.manage(Mutex::new(watcher));
+            files::search::warmup_index("md");
 
             let args: Vec<String> = std::env::args().collect();
             let state = app.state::<FileState>();

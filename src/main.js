@@ -230,8 +230,6 @@ function renderResults() {
 }
 
 let debounceTimer;
-let currentUnlistenResult = null;
-let currentUnlistenDone = null;
 
 async function onSearchInput(e) {
   const query = e.target.value.trim();
@@ -243,39 +241,10 @@ async function onSearchInput(e) {
     selectedIndex = -1;
     renderResults();
 
-    if (currentUnlistenResult) {
-      currentUnlistenResult();
-      currentUnlistenResult = null;
+    if (query === "") {
+      invoke("cancel_fuzzy_search");
+      return;
     }
-    if (currentUnlistenDone) {
-      currentUnlistenDone();
-      currentUnlistenDone = null;
-    }
-
-    await invoke("cancel_fuzzy_search");
-
-    if (query === "") return;
-
-    currentUnlistenResult = await listen("live_fuzzy_result", (event) => {
-      console.log("Received search results:", event.payload);
-      const payload = event.payload;
-      
-      results = payload;
-      renderResults();
-    });
-
-    currentUnlistenDone = await listen("live_fuzzy_done", () => {
-      console.log("Search complete! Final results:", results.length);
-      
-      if (currentUnlistenResult) {
-        currentUnlistenResult();
-        currentUnlistenResult = null;
-      }
-      if (currentUnlistenDone) {
-        currentUnlistenDone();
-        currentUnlistenDone = null;
-      }
-    });
 
     await invoke("start_live_fuzzy_search", {
       extension: "md",
@@ -298,6 +267,11 @@ window.addEventListener("DOMContentLoaded", () => {
     fileChangeTimer = setTimeout(() => {
       parseFile(path, true);
     }, 100);
+  });
+
+  listen("live_fuzzy_result", (event) => {
+    results = event.payload;
+    renderResults();
   });
   
   parseFile();

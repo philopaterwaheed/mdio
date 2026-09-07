@@ -1,92 +1,223 @@
-use tauri::{AppHandle, Manager};
-use walkdir::WalkDir;
+use crate::types::SearchResult;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 use std::{
-    path::PathBuf,
-    sync::{Arc, atomic::{AtomicBool, Ordering}},
-    thread,
     collections::BinaryHeap,
+    ffi::OsStr,
+    path::PathBuf,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, Mutex,
+    },
+    thread,
+    time::{Duration, Instant},
 };
-use tauri::Emitter;
-use once_cell::sync::Lazy;
-use crate::types::SearchResult;
+use tauri::{AppHandle, Emitter};
+use walkdir::WalkDir;
 
-// Shared cancel flag (used by all searches)
-static CANCEL_FLAG: Lazy<Arc<AtomicBool>> = Lazy::new(|| Arc::new(AtomicBool::new(false)));
+const MAX_RESULTS: usize = 100;
+const EMIT_INTERVAL: Duration = Duration::from_millis(40);
+
+static SEARCH_GEN: AtomicU64 = AtomicU64::new(0);
+static INDEX: Mutex<Option<FileIndex>> = Mutex::new(None);
+static INDEX_BUILD: Mutex<()> = Mutex::new(());
+
+struct FileIndex {
+    extension: String,
+    files: Arc<Vec<(String, String)>>,
+}
 
 #[tauri::command]
 pub fn cancel_fuzzy_search() {
-    CANCEL_FLAG.store(true, Ordering::SeqCst);
+    SEARCH_GEN.fetch_add(1, Ordering::Relaxed);
+}
+
+pub fn warmup_index(extension: &str) {
+    let extension = extension.to_string();
+    thread::spawn(move || {
+        let _build = INDEX_BUILD.lock().unwrap_or_else(|e| e.into_inner());
+        if cached_index(&extension).is_some() {
+            return;
+        }
+        let files = collect_files(&extension, &|| false);
+        store_index(extension, files);
+    });
 }
 
 #[tauri::command]
 pub async fn start_live_fuzzy_search(app: AppHandle, extension: String, query: String) {
-    // cancel any running search first
-    CANCEL_FLAG.store(true, Ordering::SeqCst);
-    // wait briefly for old thread to notice
-    std::thread::sleep(std::time::Duration::from_millis(50));
-    // reset cancel flag
-    CANCEL_FLAG.store(false, Ordering::SeqCst);
-    
-    let cancel_flag = CANCEL_FLAG.clone();
-    
+    let my_gen = SEARCH_GEN.fetch_add(1, Ordering::Relaxed) + 1;
+    let is_cancelled = move || SEARCH_GEN.load(Ordering::Relaxed) != my_gen;
+
     thread::spawn(move || {
         let matcher = SkimMatcherV2::default();
-        let root = dirs::home_dir().unwrap_or(PathBuf::from("/"));
-        
-        let mut top_results: BinaryHeap<SearchResult> = BinaryHeap::new();
-        const MAX_RESULTS: usize = 100;
-        
-        for entry in WalkDir::new(root)
-            .into_iter()
-            .filter_map(Result::ok)
-            .filter(|e| e.file_type().is_file())
-        {
-            if cancel_flag.load(Ordering::SeqCst) {
-                break;
-            }
-            
-            let path = entry.path();
-            if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
-                if ext == extension {
-                    let filename = path.file_name().unwrap().to_string_lossy();
-                    if let Some(score) = matcher.fuzzy_match(&filename, &query) {
-                        let result = SearchResult {
-                            name: filename.to_string(),
-                            path: path.to_string_lossy().to_string(),
-                            score,
-                        };
-                        
-                        let should_emit = if top_results.len() < MAX_RESULTS {
-                            top_results.push(result);
-                            true
-                        } else if let Some(min_result) = top_results.peek() {
-                            if score > min_result.score {
-                                top_results.pop();
-                                top_results.push(result);
-                                true
-                            } else {
-                                false
-                            }
-                        } else {
-                            false
-                        };
-                        
-                        if should_emit {
-                            let mut sorted_results: Vec<_> = top_results.iter().cloned().collect();
-                            sorted_results.sort_by(|a, b| b.score.cmp(&a.score));
-                            
-                            let _ = app.emit("live_fuzzy_result", sorted_results);
-                        }
-                    }
+
+        if let Some(files) = cached_index(&extension) {
+            search_index(&app, &matcher, &query, &files, &is_cancelled);
+            return;
+        }
+
+        let _build = INDEX_BUILD.lock().unwrap_or_else(|e| e.into_inner());
+        if is_cancelled() {
+            return;
+        }
+        if let Some(files) = cached_index(&extension) {
+            drop(_build);
+            search_index(&app, &matcher, &query, &files, &is_cancelled);
+            return;
+        }
+
+        let mut indexed = Vec::new();
+        let mut top_results = BinaryHeap::new();
+        let mut last_emit = Instant::now()
+            .checked_sub(EMIT_INTERVAL)
+            .unwrap_or_else(Instant::now);
+
+        collect_files_with(&extension, &is_cancelled, |name, path| {
+            indexed.push((name.clone(), path.clone()));
+            if let Some(score) = matcher.fuzzy_match(&name, &query) {
+                if insert_result(
+                    &mut top_results,
+                    SearchResult {
+                        name,
+                        path,
+                        score,
+                    },
+                ) && last_emit.elapsed() >= EMIT_INTERVAL
+                {
+                    emit_snapshot(&app, &top_results);
+                    last_emit = Instant::now();
                 }
             }
+        });
+
+        if is_cancelled() {
+            return;
         }
-        
-        let final_results: Vec<_> = top_results.into_sorted_vec();
-        
-        let _ = app.emit("live_fuzzy_result", final_results);
+
+        store_index(extension, indexed);
+        emit_snapshot(&app, &top_results);
         let _ = app.emit("live_fuzzy_done", {});
     });
+}
+
+fn search_index(
+    app: &AppHandle,
+    matcher: &SkimMatcherV2,
+    query: &str,
+    files: &[(String, String)],
+    is_cancelled: &dyn Fn() -> bool,
+) {
+    let mut top_results = BinaryHeap::new();
+
+    for (name, path) in files {
+        if is_cancelled() {
+            return;
+        }
+        if let Some(score) = matcher.fuzzy_match(name, query) {
+            insert_result(
+                &mut top_results,
+                SearchResult {
+                    name: name.clone(),
+                    path: path.clone(),
+                    score,
+                },
+            );
+        }
+    }
+
+    if is_cancelled() {
+        return;
+    }
+
+    emit_snapshot(app, &top_results);
+    let _ = app.emit("live_fuzzy_done", {});
+}
+
+fn insert_result(heap: &mut BinaryHeap<SearchResult>, result: SearchResult) -> bool {
+    if heap.len() < MAX_RESULTS {
+        heap.push(result);
+        return true;
+    }
+    if heap.peek().is_some_and(|min| result.score > min.score) {
+        heap.pop();
+        heap.push(result);
+        return true;
+    }
+    false
+}
+
+fn emit_snapshot(app: &AppHandle, heap: &BinaryHeap<SearchResult>) {
+    let mut sorted: Vec<_> = heap.iter().cloned().collect();
+    sorted.sort_by(|a, b| b.score.cmp(&a.score));
+    let _ = app.emit("live_fuzzy_result", sorted);
+}
+
+fn cached_index(extension: &str) -> Option<Arc<Vec<(String, String)>>> {
+    let index = INDEX.lock().unwrap_or_else(|e| e.into_inner());
+    index.as_ref().and_then(|index| {
+        (index.extension == extension).then(|| Arc::clone(&index.files))
+    })
+}
+
+fn store_index(extension: String, files: Vec<(String, String)>) {
+    let mut index = INDEX.lock().unwrap_or_else(|e| e.into_inner());
+    *index = Some(FileIndex {
+        extension,
+        files: Arc::new(files),
+    });
+}
+
+fn collect_files(extension: &str, is_cancelled: &dyn Fn() -> bool) -> Vec<(String, String)> {
+    let mut files = Vec::new();
+    collect_files_with(extension, is_cancelled, |name, path| {
+        files.push((name, path));
+    });
+    files
+}
+
+fn collect_files_with(
+    extension: &str,
+    is_cancelled: &dyn Fn() -> bool,
+    mut on_file: impl FnMut(String, String),
+) {
+    let root = dirs::home_dir().unwrap_or_else(|| PathBuf::from("/"));
+    let ext = OsStr::new(extension);
+
+    for entry in WalkDir::new(root)
+        .follow_links(false)
+        .into_iter()
+        .filter_entry(|entry| {
+            !entry.file_type().is_dir() || !should_skip_dir(entry.file_name())
+        })
+        .filter_map(Result::ok)
+    {
+        if is_cancelled() {
+            return;
+        }
+        if !entry.file_type().is_file() {
+            continue;
+        }
+
+        let path = entry.path();
+        if path.extension() != Some(ext) {
+            continue;
+        }
+
+        on_file(
+            entry.file_name().to_string_lossy().into_owned(),
+            path.to_string_lossy().into_owned(),
+        );
+    }
+}
+
+fn should_skip_dir(name: &OsStr) -> bool {
+    let name = name.to_string_lossy();
+    if name.starts_with('.') {
+        return true;
+    }
+    matches!(
+        name.as_ref(),
+        "node_modules" | "target" | "__pycache__" | "venv" | "snap"
+    )
 }
