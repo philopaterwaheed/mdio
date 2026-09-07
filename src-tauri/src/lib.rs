@@ -2,9 +2,11 @@
 mod types;
 mod files;
 
+use files::notify::FileWatcher;
 use types::{CurruntFile, FileState};
 use pulldown_cmark::{html, Options, Parser};
 use std::fs;
+use std::sync::Mutex;
 use tauri::Manager;
 
 #[tauri::command]
@@ -40,36 +42,65 @@ fn list_files(state: tauri::State<FileState>) -> Vec<String> {
 #[tauri::command]
 fn parse_file(
     state: tauri::State<CurruntFile>,
+    watcher: tauri::State<Mutex<FileWatcher>>,
     file_path: Option<String>,
 ) -> Result<String, String> {
-    if file_path.is_none() {
-        if state.path.is_none() {
-            return Err("No file path provided".into());
-        } else {
-            let path = state.path.as_ref().unwrap().clone();
-            let contents = fs::read_to_string(&path)
-                .map_err(|e| format!("Failed to read file '{}': {}", path, e))?;
-            let html = render_markdown(contents);
-            return Ok(html);
-        }
-    } else {
+    let path = match file_path {
+        Some(path) => path,
+        None => state
+            .path
+            .clone()
+            .ok_or_else(|| "No file path provided".to_string())?,
+    };
 
-        let path = file_path.as_ref().unwrap();
-        let contents = fs::read_to_string(&path)
-            .map_err(|e| format!("Failed to read file '{}': {}", path, e))?;
-        let html = render_markdown(contents);
-        println!("got here");
-        return Ok(html);
+    if let Ok(mut watcher) = watcher.lock() {
+        if let Err(e) = watcher.watch_file(path.clone()) {
+            eprintln!("Failed to watch file '{}': {}", path, e);
+        }
     }
+
+    let contents = fs::read_to_string(&path)
+        .map_err(|e| format!("Failed to read file '{}': {}", path, e))?;
+    Ok(render_markdown(contents))
+}
+
+#[tauri::command]
+fn watch_file(watcher: tauri::State<Mutex<FileWatcher>>, path: String) -> Result<(), String> {
+    watcher
+        .lock()
+        .map_err(|e| e.to_string())?
+        .watch_file(path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn stop_watching(watcher: tauri::State<Mutex<FileWatcher>>) -> Result<(), String> {
+    watcher
+        .lock()
+        .map_err(|e| e.to_string())?
+        .stop_watching()
+        .map_err(|e| e.to_string())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![render_markdown, parse_file, add_file, files::search::start_live_fuzzy_search ,files::search::cancel_fuzzy_search, list_files])
+        .invoke_handler(tauri::generate_handler![
+            render_markdown,
+            parse_file,
+            add_file,
+            files::search::start_live_fuzzy_search,
+            files::search::cancel_fuzzy_search,
+            list_files,
+            watch_file,
+            stop_watching
+        ])
         .manage(FileState::new())
         .setup(|app| {
+            let watcher = FileWatcher::new(app.handle().clone())?;
+            app.manage(Mutex::new(watcher));
+
             let args: Vec<String> = std::env::args().collect();
             let state = app.state::<FileState>();
             let mut files = state.files.lock().unwrap();

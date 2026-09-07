@@ -97,10 +97,12 @@ window.selectTheme = function(themeId) {
   closeThemePopup();
 };
 
-window.parseFile = async function (filePath) {
+window.parseFile = async function (filePath, silent = false) {
   try {
     console.log("parsing");
-    outputEl.innerHTML = "<p>Parsing file...</p>";
+    if (!silent) {
+      outputEl.innerHTML = "<p>Parsing file...</p>";
+    }
     const result = await invoke("parse_file", { filePath });
     outputEl.innerHTML = result;
     outputEl.querySelectorAll('pre code').forEach((block) => {
@@ -282,11 +284,21 @@ async function onSearchInput(e) {
   }, 250);
 }
 
+let fileChangeTimer;
+
 window.addEventListener("DOMContentLoaded", () => {
   outputEl = document.querySelector("#output");
   
   // Load saved theme
   loadSavedTheme();
+
+  listen("file-changed", (event) => {
+    const path = event.payload;
+    clearTimeout(fileChangeTimer);
+    fileChangeTimer = setTimeout(() => {
+      parseFile(path, true);
+    }, 100);
+  });
   
   parseFile();
   searchInput.addEventListener("input", onSearchInput);

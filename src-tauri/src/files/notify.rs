@@ -1,7 +1,7 @@
 use notify::event::ModifyKind;
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::path::PathBuf;
-use std::sync::mpsc::{channel, Sender};
+use std::sync::mpsc::channel;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use tauri::Emitter;
@@ -55,13 +55,16 @@ impl FileWatcher {
     }
 
     pub fn watch_file(&mut self, path: String) -> notify::Result<()> {
+        let path_buf = PathBuf::from(&path);
         if let Ok(current) = self.current_path.lock() {
+            if current.as_ref() == Some(&path_buf) {
+                return Ok(());
+            }
             if let Some(old_path) = current.as_ref() {
                 let _ = self.watcher.unwatch(old_path);
                 println!("Stopped watching: {:?}", old_path);
             }
         }
-        let path_buf = PathBuf::from(&path);
         self.watcher.watch(&path_buf, RecursiveMode::NonRecursive)?;
         println!("Now watching: {:?}", path_buf);
         if let Ok(mut current) = self.current_path.lock() {
