@@ -34,6 +34,7 @@ window.closePopup = function () {
   results = [];
   selectedIndex = -1;
   leaderActive = false;
+  searchInput.blur();
   invoke("cancel_fuzzy_search");
 }
 
@@ -50,6 +51,7 @@ function closeThemePopup() {
   themeResults = [];
   themeSelectedIndex = -1;
   leaderActive = false;
+  themeInput.blur();
 }
 
 function renderThemes(query) {
@@ -95,6 +97,7 @@ function updateThemeSelection() {
 window.selectTheme = function(themeId) {
   applyTheme(themeId);
   closeThemePopup();
+  ignoreOutputClickUntil = Date.now() + 200;
 };
 
 const utf8 = new TextEncoder();
@@ -107,6 +110,7 @@ let editorSession = null;
 let cursorStart = null;
 let lastBlockStart = null;
 let hintState = null;
+let ignoreOutputClickUntil = 0;
 
 const HINT_CHARS = "asdfghjklqwertyuiopzxcvbnm";
 
@@ -829,6 +833,7 @@ window.addEventListener("keydown", (e) => {
 
   if (e.key === "Escape") {
     e.preventDefault();
+    e.stopImmediatePropagation();
     closePopup();
     return;
   }
@@ -846,6 +851,7 @@ window.addEventListener("keydown", (e) => {
     updateSelection();
   } else if (e.key === "Enter" && selectedIndex >= 0) {
     e.preventDefault();
+    e.stopImmediatePropagation();
     const selected = boxes[selectedIndex];
     const path = selected.dataset.path;
     closePopup();
@@ -858,6 +864,7 @@ window.addEventListener("keydown", (e) => {
 
   if (e.key === "Escape") {
     e.preventDefault();
+    e.stopImmediatePropagation();
     closeThemePopup();
     return;
   }
@@ -875,6 +882,7 @@ window.addEventListener("keydown", (e) => {
     updateThemeSelection();
   } else if (e.key === "Enter" && themeSelectedIndex >= 0) {
     e.preventDefault();
+    e.stopImmediatePropagation();
     const selected = boxes[themeSelectedIndex];
     const themeId = selected.dataset.themeId;
     selectTheme(themeId);
@@ -957,6 +965,9 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   outputEl.addEventListener("click", (e) => {
+    if (Date.now() < ignoreOutputClickUntil) {
+      return;
+    }
     if (hintState) {
       stopHintMode();
     }
@@ -1046,6 +1057,10 @@ window.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    if (e.target.closest("input, textarea") && !e.target.closest(".md-line-editor")) {
+      return;
+    }
+
     if (hintState) {
       if (e.key === "j" || e.key === "k" || e.key === "i" || e.key === "Enter" || e.key === "o" || e.key === "O") {
         stopHintMode();
@@ -1109,10 +1124,6 @@ window.addEventListener("DOMContentLoaded", () => {
         }
         return;
       }
-    }
-
-    if (e.target.closest("input, textarea")) {
-      return;
     }
 
     if (!leaderActive && e.key === " ") {
