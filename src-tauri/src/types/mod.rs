@@ -3,8 +3,24 @@ use std::cmp::Ordering as CmpOrdering;
 use std::sync::{Arc, Mutex};
 
 #[derive(Default)]
-pub struct CurruntFile {
+pub struct CurrentDoc {
     pub path: Option<String>,
+    pub source: String,
+}
+
+pub struct CurruntFile {
+    pub doc: Mutex<CurrentDoc>,
+}
+
+impl CurruntFile {
+    pub fn new(path: Option<String>) -> Self {
+        Self {
+            doc: Mutex::new(CurrentDoc {
+                path,
+                source: String::new(),
+            }),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -37,7 +53,6 @@ impl PartialEq for SearchResult {
 
 impl Ord for SearchResult {
     fn cmp(&self, other: &Self) -> CmpOrdering {
-        // Reverse ordering to create a min-heap (smallest score at top)
         other.score.cmp(&self.score)
     }
 }
@@ -46,6 +61,13 @@ impl PartialOrd for SearchResult {
     fn partial_cmp(&self, other: &Self) -> Option<CmpOrdering> {
         Some(self.cmp(other))
     }
+}
+
+#[derive(Debug, Serialize)]
+pub struct RenderedFile {
+    pub html: String,
+    pub source: String,
+    pub path: String,
 }
 
 pub struct WatcherState {

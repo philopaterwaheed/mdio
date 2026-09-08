@@ -364,3 +364,132 @@ h1 {
   font-size: 0.9em;
   line-height: 1.5;
 }
+
+.md-block {
+  cursor: text;
+  border-radius: 4px;
+}
+
+.md-block:hover {
+  outline: 1px dashed var(--border-secondary);
+  outline-offset: 4px;
+}
+
+.md-block.md-cursor {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 4px;
+  background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
+}
+
+.md-empty-file {
+  color: var(--text-muted);
+  font-style: italic;
+  min-height: 3em;
+  padding: 1em 0.5em;
+  outline: 1px dashed var(--border-secondary);
+  outline-offset: 4px;
+}
+
+.md-add-slot {
+  display: block;
+  width: 100%;
+  margin-top: 1.5em;
+  padding: 8px 12px;
+  border: 1px dashed var(--border-secondary);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: text;
+  font: inherit;
+  text-align: left;
+}
+
+.md-add-slot:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+#hintLayer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2000;
+}
+
+.md-hint {
+  position: absolute;
+  min-width: 1.15em;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--accent-primary);
+  color: var(--bg-primary);
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  box-shadow: 0 1px 4px var(--shadow);
+}
+
+.md-hint.md-hint-dim {
+  opacity: 0.2;
+}
+
+.md-line-editor {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 1em 0;
+  padding: 2px 4px;
+  border: none;
+  border-radius: 4px;
+  outline: 1px solid var(--accent-primary);
+  background: transparent;
+  color: var(--text-primary);
+  resize: none;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.md-editor-h1 {
+  font-size: 2em;
+  font-weight: 700;
+  margin-bottom: 0.5em;
+  border-bottom: 2px solid var(--border-primary);
+  padding-bottom: 0.3em;
+}
+
+.md-editor-h2 {
+  font-size: 1.6em;
+  font-weight: 700;
+  margin-bottom: 0.5em;
+  border-bottom: 1px solid var(--border-primary);
+  padding-bottom: 0.3em;
+}
+
+.md-editor-h3,
+.md-editor-h4,
+.md-editor-h5,
+.md-editor-h6 {
+  font-weight: 700;
+  color: var(--heading-color);
+}
+
+.md-editor-code {
+  font-family: 'Courier New', Consolas, Monaco, monospace;
+  background: var(--code-bg);
+  padding: 15px;
+  border: 1px solid var(--border-primary);
+}
+
+.md-editor-quote {
+  border-left: 4px solid var(--quote-border);
+  padding-left: 1em;
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+.md-editor-li {
+  margin-left: 1em;
+}
