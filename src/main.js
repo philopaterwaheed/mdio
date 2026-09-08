@@ -1,7 +1,7 @@
 import { themes, applyTheme, loadSavedTheme, getCurrentTheme } from './themes/themes.js';
 
 const { listen } = window.__TAURI__.event;
-const { invoke } = window.__TAURI__.core;
+const { invoke, convertFileSrc } = window.__TAURI__.core;
 
 let outputEl;
 let searchResultsEl = document.getElementById("searchResults");
@@ -119,12 +119,71 @@ function utf8Slice(start, end) {
   return utf8dec.decode(sourceBytes.subarray(start, end));
 }
 
+function isRemoteSrc(src) {
+  return /^(https?:|data:|blob:|asset:|http:\/\/asset\.localhost|https:\/\/asset\.localhost)/i.test(
+    src,
+  );
+}
+
+function resolveFsPath(src, docPath) {
+  if (!src) {
+    return null;
+  }
+  let path = src.trim();
+  if (path.startsWith("file://")) {
+    path = decodeURIComponent(path.replace(/^file:\/\/(localhost)?/i, ""));
+  }
+  if (path.startsWith("/") && !path.startsWith("//")) {
+    return path;
+  }
+  if (!docPath) {
+    return null;
+  }
+  const dir = docPath.replace(/[/\\][^/\\]*$/, "") || ".";
+  const parts = dir.split("/").filter(Boolean);
+  for (const seg of path.replace(/\\/g, "/").split("/")) {
+    if (!seg || seg === ".") {
+      continue;
+    }
+    if (seg === "..") {
+      parts.pop();
+    } else {
+      parts.push(seg);
+    }
+  }
+  return `${dir.startsWith("/") ? "/" : ""}${parts.join("/")}`;
+}
+
+function decorateImages() {
+  outputEl.querySelectorAll("img").forEach((img) => {
+    if (img.closest(".md-image-preview")) {
+      return;
+    }
+    const raw = img.getAttribute("src") || "";
+    if (raw && !isRemoteSrc(raw)) {
+      const fsPath = resolveFsPath(raw, currentPath);
+      if (fsPath && typeof convertFileSrc === "function") {
+        img.src = convertFileSrc(fsPath);
+      }
+    }
+    const title = (img.getAttribute("alt") || "").trim() || "Image Preview";
+    const frame = document.createElement("span");
+    frame.className = "md-image-preview";
+    const label = document.createElement("span");
+    label.className = "md-image-title";
+    label.textContent = title;
+    img.replaceWith(frame);
+    frame.append(label, img);
+  });
+}
+
 function applyRendered(payload, preserveScroll = false) {
   stopHintMode();
   const scrollY = preserveScroll ? window.scrollY : 0;
   currentPath = payload.path;
   setSource(payload.source);
   outputEl.innerHTML = payload.html;
+  decorateImages();
   outputEl.querySelectorAll("pre code").forEach((block) => {
     hljs.highlightElement(block);
   });

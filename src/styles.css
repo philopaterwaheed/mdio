@@ -365,6 +365,39 @@ h1 {
   line-height: 1.5;
 }
 
+.md-image-preview {
+  display: block;
+  position: relative;
+  margin: 1.25em 0;
+  padding: 14px 10px 10px;
+  background: #000;
+  border: 1px solid #cdd6f4;
+  color: #fff;
+  font-family: ui-monospace, "Courier New", Consolas, monospace;
+}
+
+.md-image-title {
+  position: absolute;
+  top: -0.55em;
+  left: 0.85em;
+  padding: 0 0.45em;
+  background: #000;
+  color: #89dceb;
+  font-size: 0.8em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.md-image-preview img {
+  display: block;
+  max-width: 100%;
+  max-height: min(70vh, 520px);
+  width: auto;
+  height: auto;
+  margin: 0 auto;
+  object-fit: contain;
+}
+
 .md-block {
   cursor: text;
   border-radius: 4px;
