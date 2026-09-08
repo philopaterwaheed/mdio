@@ -20,6 +20,65 @@
 	  <input type="text" id="themeInput" placeholder="Search themes..." />
 	    <div id="themeResults" class="results"></div>
      </div>
+
+     <div id="helpDashboard" class="help-dashboard" role="dialog" aria-labelledby="helpTitle">
+       <div class="help-panel">
+         <header class="help-header">
+           <div>
+             <h1 id="helpTitle">mdio</h1>
+             <p class="help-sub">markdown viewer and block editor</p>
+           </div>
+           <p class="help-close-hint">press <kbd>?</kbd> or <kbd>Esc</kbd> to close</p>
+         </header>
+         <p class="help-intro">
+           Open a note, move with <kbd>j</kbd>/<kbd>k</kbd>, edit one block at a time.
+           The markdown file on disk is the source of truth — saving splices that block back in.
+           Live reload picks up edits from other apps.
+         </p>
+         <div class="help-grid">
+           <section class="help-card">
+             <h2>open</h2>
+             <dl>
+               <div><dt><kbd>Space</kbd> <kbd>f</kbd></dt><dd>search markdown files</dd></div>
+               <div><dt><kbd>↑</kbd> <kbd>↓</kbd> <kbd>Enter</kbd></dt><dd>pick a search result</dd></div>
+               <div><dt><kbd>Space</kbd> <kbd>t</kbd></dt><dd>switch theme</dd></div>
+               <div><dt><kbd>?</kbd></dt><dd>this dashboard</dd></div>
+             </dl>
+           </section>
+           <section class="help-card">
+             <h2>move</h2>
+             <dl>
+               <div><dt><kbd>j</kbd> / <kbd>↓</kbd></dt><dd>next block</dd></div>
+               <div><dt><kbd>k</kbd> / <kbd>↑</kbd></dt><dd>previous block</dd></div>
+               <div><dt><kbd>g</kbd></dt><dd>first block</dd></div>
+               <div><dt><kbd>G</kbd></dt><dd>last block</dd></div>
+               <div><dt><kbd>f</kbd> then letter</dt><dd>hop to a visible block and edit</dd></div>
+               <div><dt><kbd>Esc</kbd></dt><dd>clear the block cursor</dd></div>
+             </dl>
+           </section>
+           <section class="help-card">
+             <h2>edit</h2>
+             <dl>
+               <div><dt><kbd>i</kbd> / <kbd>Enter</kbd></dt><dd>edit the selected block</dd></div>
+               <div><dt><kbd>o</kbd></dt><dd>insert a block below</dd></div>
+               <div><dt><kbd>O</kbd></dt><dd>insert a block above</dd></div>
+               <div><dt>click</dt><dd>edit that block, caret on the clicked line</dd></div>
+               <div><dt><kbd>+ add</kbd></dt><dd>append at the end of the file</dd></div>
+             </dl>
+           </section>
+           <section class="help-card">
+             <h2>while editing</h2>
+             <dl>
+               <div><dt><kbd>Enter</kbd></dt><dd>save a single-line block</dd></div>
+               <div><dt><kbd>Ctrl</kbd> <kbd>Enter</kbd></dt><dd>save any block</dd></div>
+               <div><dt><kbd>Esc</kbd></dt><dd>cancel without saving</dd></div>
+             </dl>
+           </section>
+         </div>
+       </div>
+     </div>
+
+     <button type="button" id="helpChip" class="help-chip" title="Help (?)" tabindex="-1">?</button>
      
     <div class="container">
       <div id="output" class="output">

@@ -13,6 +13,8 @@ const closeBtn = document.getElementById("closeBtn");
 const themePopup = document.getElementById("themePopup");
 const themeInput = document.getElementById("themeInput");
 const themeResultsEl = document.getElementById("themeResults");
+const helpDashboard = document.getElementById("helpDashboard");
+const helpChip = document.getElementById("helpChip");
 
 let leaderActive = false;
 let leaderTimeout;
@@ -52,6 +54,31 @@ function closeThemePopup() {
   themeSelectedIndex = -1;
   leaderActive = false;
   themeInput.blur();
+}
+
+function isHelpOpen() {
+  return helpDashboard.style.display === "flex";
+}
+
+function openHelpDashboard() {
+  closePopup();
+  closeThemePopup();
+  stopHintMode();
+  helpDashboard.style.display = "flex";
+  helpChip.setAttribute("aria-expanded", "true");
+}
+
+function closeHelpDashboard() {
+  helpDashboard.style.display = "none";
+  helpChip.setAttribute("aria-expanded", "false");
+}
+
+function toggleHelpDashboard() {
+  if (isHelpOpen()) {
+    closeHelpDashboard();
+  } else {
+    openHelpDashboard();
+  }
 }
 
 function renderThemes(query) {
@@ -206,7 +233,7 @@ window.parseFile = async function (filePath, silent = false) {
     if (editorSession) {
       await commitEditor();
     }
-    if (!silent) {
+    if (!silent && filePath) {
       outputEl.innerHTML = "<p>Parsing file...</p>";
     }
     const result = await invoke("parse_file", { filePath });
@@ -215,9 +242,22 @@ window.parseFile = async function (filePath, silent = false) {
       lastBlockStart = null;
     }
     applyRendered(result, silent);
+    if (!silent) {
+      closeHelpDashboard();
+    }
   } catch (error) {
+    const message = error?.message || String(error);
+    if (/No file path provided|No file is open/i.test(message)) {
+      showStartupHelp();
+      return;
+    }
     outputEl.innerHTML = `<p style="color: red;">Error: ${error}</p>`;
   }
+}
+
+function showStartupHelp() {
+  outputEl.innerHTML = "";
+  openHelpDashboard();
 }
 
 let reloadInFlight = false;
@@ -487,16 +527,6 @@ function onEditorKeyDown(e) {
   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
     e.preventDefault();
     commitEditor();
-    return;
-  }
-
-  if (e.key === "Tab") {
-    e.preventDefault();
-    if (!e.shiftKey && editorSession.nextStart == null) {
-      commitThenInsertBelow();
-      return;
-    }
-    commitEditor(e.shiftKey ? editorSession.prevStart : editorSession.nextStart);
     return;
   }
 
@@ -806,8 +836,7 @@ async function loadInitialFile() {
       alert(`Loading file: ${initialFile}`);
       await parseFile(initialFile);
     } else {
-      outputEl.innerHTML =
-        '<p style="color: red;">No file path provided. Please pass a file path as a command-line argument.</p>';
+      showStartupHelp();
     }
   } catch (error) {
     console.error("Error getting initial file:", error);
@@ -856,6 +885,16 @@ window.addEventListener("keydown", (e) => {
     const path = selected.dataset.path;
     closePopup();
     parseFile(path);
+  }
+});
+
+window.addEventListener("keydown", (e) => {
+  if (!isHelpOpen()) return;
+
+  if (e.key === "Escape" || e.key === "?") {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    closeHelpDashboard();
   }
 });
 
@@ -1002,7 +1041,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (!editorSession) {
       return;
     }
-    if (e.target.closest(".md-line-editor, .md-block, .popup")) {
+    if (e.target.closest(".md-line-editor, .md-block, .popup, .help-dashboard, .help-chip")) {
       return;
     }
     commitEditor();
@@ -1023,6 +1062,15 @@ window.addEventListener("DOMContentLoaded", () => {
     themeSelectedIndex = 0;
     updateThemeSelection();
   });
+  helpChip.addEventListener("click", (e) => {
+    e.preventDefault();
+    toggleHelpDashboard();
+  });
+  helpDashboard.addEventListener("click", (e) => {
+    if (e.target === helpDashboard) {
+      closeHelpDashboard();
+    }
+  });
   
   // Leader key logic
   window.addEventListener("keydown", (e) => {
@@ -1035,6 +1083,11 @@ window.addEventListener("DOMContentLoaded", () => {
       if (themePopup.style.display === "block") {
         e.preventDefault();
         closeThemePopup();
+        return;
+      }
+      if (isHelpOpen()) {
+        e.preventDefault();
+        closeHelpDashboard();
         return;
       }
       if (hintState) {
@@ -1053,7 +1106,7 @@ window.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    if (searchPopup.style.display === "block" || themePopup.style.display === "block") {
+    if (searchPopup.style.display === "block" || themePopup.style.display === "block" || isHelpOpen()) {
       return;
     }
 
@@ -1122,6 +1175,11 @@ window.addEventListener("DOMContentLoaded", () => {
         if (list.length > 0) {
           setCursor(list[list.length - 1]);
         }
+        return;
+      }
+      if (e.key === "?") {
+        e.preventDefault();
+        openHelpDashboard();
         return;
       }
     }

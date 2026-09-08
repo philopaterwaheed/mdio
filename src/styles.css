@@ -526,3 +526,141 @@ h1 {
 .md-editor-li {
   margin-left: 1em;
 }
+
+.help-chip {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 900;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border-secondary);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--accent-primary);
+  font: 700 16px ui-monospace, "Courier New", monospace;
+  cursor: pointer;
+  box-shadow: 0 2px 8px var(--shadow);
+}
+
+.help-chip:hover,
+.help-chip:focus-visible {
+  border-color: var(--accent-primary);
+  color: var(--accent-hover);
+  outline: none;
+}
+
+.help-dashboard {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: color-mix(in srgb, var(--bg-tertiary) 78%, transparent);
+  backdrop-filter: blur(8px);
+  overflow: auto;
+}
+
+.help-panel {
+  width: min(920px, 100%);
+  max-height: min(90vh, 860px);
+  overflow: auto;
+  padding: 22px 24px 24px;
+  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+  background: var(--bg-secondary);
+  box-shadow: 0 12px 32px var(--shadow);
+  color: var(--text-primary);
+}
+
+.help-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.help-header h1 {
+  margin: 0;
+  text-align: left;
+  font-size: 1.6em;
+  color: var(--heading-color);
+}
+
+.help-sub,
+.help-close-hint {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 0.9em;
+}
+
+.help-intro {
+  margin: 0 0 18px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.help-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.help-card {
+  padding: 14px 14px 8px;
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
+  background: var(--bg-accent);
+}
+
+.help-card h2 {
+  margin: 0 0 10px;
+  font-size: 0.85em;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  color: var(--accent-border);
+}
+
+.help-card dl {
+  margin: 0;
+}
+
+.help-card dl > div {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 7px 0;
+  border-top: 1px solid var(--border-primary);
+}
+
+.help-card dt {
+  flex: 0 1 auto;
+  color: var(--text-primary);
+  font-family: ui-monospace, "Courier New", Consolas, monospace;
+  font-size: 0.82em;
+}
+
+.help-card dd {
+  margin: 0;
+  flex: 1 1 50%;
+  text-align: right;
+  color: var(--text-secondary);
+  font-size: 0.85em;
+}
+
+.help-dashboard kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--border-secondary);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-family: ui-monospace, "Courier New", Consolas, monospace;
+  font-size: 0.85em;
+  white-space: nowrap;
+}
