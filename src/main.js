@@ -387,34 +387,27 @@ function ensureEditableSurface() {
   outputEl.appendChild(slot);
 }
 
-function pointAfter(block) {
-  let at = Number(block.dataset.end);
-  if (Number.isNaN(at)) {
-    return sourceBytes.length;
-  }
-  while (at < sourceBytes.length && (sourceBytes[at] === 10 || sourceBytes[at] === 13)) {
-    at += 1;
-  }
-  return at;
-}
-
 function insertedSource(text, at) {
   if (text === "") {
     return "";
   }
+  const body = text.replace(/\n+$/, "");
   if (sourceBytes.length === 0) {
-    return text;
+    return body;
   }
-  let out = text;
-  if (at > 0 && sourceBytes[at - 1] !== 10) {
-    out = "\n\n" + out;
-  } else if (at > 1 && sourceBytes[at - 1] === 10 && sourceBytes[at - 2] !== 10) {
-    out = "\n" + out;
+  const before = utf8dec.decode(sourceBytes.subarray(Math.max(0, at - 2), at));
+  const after = utf8dec.decode(
+    sourceBytes.subarray(at, Math.min(sourceBytes.length, at + 2)),
+  );
+  let prefix = "";
+  if (at > 0 && !before.endsWith("\n\n")) {
+    prefix = before.endsWith("\n") ? "\n" : "\n\n";
   }
-  if (at < sourceBytes.length && sourceBytes[at] !== 10) {
-    out += "\n";
+  let suffix = "";
+  if (at < sourceBytes.length && !after.startsWith("\n\n")) {
+    suffix = after.startsWith("\n") ? "\n" : "\n\n";
   }
-  return out;
+  return prefix + body + suffix;
 }
 
 function currentBlock() {
@@ -447,12 +440,15 @@ function startInsert(at, { after = null, before = null } = {}) {
   const blocks = documentBlocks();
   let prevStart = null;
   let nextStart = null;
+  let originStart = lastBlockStart;
   if (after) {
     prevStart = Number(after.dataset.start);
+    originStart = prevStart;
     const idx = blocks.indexOf(after);
     nextStart = idx >= 0 && idx < blocks.length - 1 ? Number(blocks[idx + 1].dataset.start) : null;
   } else if (before) {
     nextStart = Number(before.dataset.start);
+    originStart = nextStart;
     const idx = blocks.indexOf(before);
     prevStart = idx > 0 ? Number(blocks[idx - 1].dataset.start) : null;
   }
@@ -465,11 +461,14 @@ function startInsert(at, { after = null, before = null } = {}) {
     inserting: true,
     prevStart,
     nextStart,
+    originStart,
   };
   autosize(editor);
   editor.focus();
-  cursorStart = at;
-  lastBlockStart = at;
+  if (originStart != null) {
+    cursorStart = originStart;
+    lastBlockStart = originStart;
+  }
   editor.addEventListener("input", () => autosize(editor));
   editor.addEventListener("keydown", onEditorKeyDown);
 }
@@ -484,7 +483,7 @@ function insertBelow() {
     startEdit(block, null);
     return;
   }
-  startInsert(pointAfter(block), { after: block });
+  startInsert(Number(block.dataset.end), { after: block });
 }
 
 function insertAbove() {
@@ -550,6 +549,7 @@ function onEditorKeyDown(e) {
   if (!editorSession) {
     return;
   }
+  e.stopPropagation();
 
   const { editor } = editorSession;
   const isMulti = editor.value.includes("\n");
@@ -788,16 +788,17 @@ function cancelEditor() {
   if (!editorSession) {
     return;
   }
-  const { editor, block } = editorSession;
+  const { editor, block, originStart } = editorSession;
   if (block) {
     editor.replaceWith(block);
     editorSession = null;
     setCursor(block);
   } else {
+    const origin = originStart ?? lastBlockStart;
     editor.remove();
     editorSession = null;
     ensureEditableSurface();
-    const restore = nearestBlock(lastBlockStart);
+    const restore = nearestBlock(origin);
     if (restore) {
       setCursor(restore);
     }
@@ -814,7 +815,7 @@ async function commitEditor(nextStart = null) {
     return;
   }
 
-  const { editor, block, start, end, inserting } = editorSession;
+  const { editor, block, start, end, inserting, originStart } = editorSession;
   const raw = editor.value;
   const original = utf8Slice(start, end);
   const text = inserting ? insertedSource(raw, start) : raw;
@@ -831,13 +832,14 @@ async function commitEditor(nextStart = null) {
   }
 
   if (inserting && raw === "") {
+    const origin = originStart ?? lastBlockStart;
     editor.remove();
     editorSession = null;
     ensureEditableSurface();
     if (nextStart != null) {
       startEdit(blockByStart(nextStart), null);
     } else {
-      const restore = nearestBlock(lastBlockStart);
+      const restore = nearestBlock(origin);
       if (restore) {
         setCursor(restore);
       }
