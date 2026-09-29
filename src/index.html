@@ -21,6 +21,12 @@
 	    <div id="themeResults" class="results"></div>
      </div>
 
+     <div id="newFilePopup" class="popup">
+	  <input type="text" id="newFileInput" placeholder="new note name..." />
+	  <p id="newFileHint" class="new-file-hint">Saved next to the open note, or in your home folder. <code>.md</code> is added if missing.</p>
+	  <p id="newFileError" class="new-file-error"></p>
+     </div>
+
      <div id="helpDashboard" class="help-dashboard" role="dialog" aria-labelledby="helpTitle">
        <div class="help-panel">
          <header class="help-header">
@@ -40,6 +46,7 @@
              <h2>open</h2>
              <dl>
                <div><dt><kbd>Space</kbd> <kbd>f</kbd></dt><dd>search markdown files</dd></div>
+               <div><dt><kbd>Space</kbd> <kbd>n</kbd></dt><dd>create a new markdown file</dd></div>
                <div><dt><kbd>↑</kbd> <kbd>↓</kbd> <kbd>Enter</kbd></dt><dd>pick a search result</dd></div>
                <div><dt><kbd>Space</kbd> <kbd>t</kbd></dt><dd>switch theme</dd></div>
                <div><dt><kbd>?</kbd></dt><dd>this dashboard</dd></div>

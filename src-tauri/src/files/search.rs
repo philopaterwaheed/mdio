@@ -168,6 +168,28 @@ fn store_index(extension: String, files: Vec<(String, String)>) {
     });
 }
 
+pub fn index_file(path: &std::path::Path) {
+    let Some(ext) = path.extension().and_then(OsStr::to_str) else {
+        return;
+    };
+    let Some(name) = path.file_name() else {
+        return;
+    };
+    let name = name.to_string_lossy().into_owned();
+    let path_s = path.to_string_lossy().into_owned();
+    let mut index = INDEX.lock().unwrap_or_else(|e| e.into_inner());
+    let Some(index) = index.as_mut() else {
+        return;
+    };
+    if index.extension != ext {
+        return;
+    }
+    let files = Arc::make_mut(&mut index.files);
+    if !files.iter().any(|(_, existing)| existing == &path_s) {
+        files.push((name, path_s));
+    }
+}
+
 fn collect_files(extension: &str, is_cancelled: &dyn Fn() -> bool) -> Vec<(String, String)> {
     let mut files = Vec::new();
     collect_files_with(extension, is_cancelled, |name, path| {

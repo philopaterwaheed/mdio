@@ -5,7 +5,7 @@ mod types;
 use files::notify::FileWatcher;
 use types::{CurruntFile, FileState, RenderedFile};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::Duration;
 use tauri::Manager;
@@ -101,6 +101,70 @@ fn splice_source(
 }
 
 #[tauri::command]
+fn create_markdown_file(
+    state: tauri::State<CurruntFile>,
+    name: String,
+) -> Result<String, String> {
+    let current = state
+        .doc
+        .lock()
+        .ok()
+        .and_then(|doc| doc.path.clone());
+    let path = resolve_new_markdown_path(&name, current.as_deref())?;
+    if path.exists() {
+        return Err(format!("Already exists: {}", path.display()));
+    }
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent).map_err(|e| {
+                format!("Failed to create '{}': {}", parent.display(), e)
+            })?;
+        }
+    }
+    fs::write(&path, "").map_err(|e| format!("Failed to create '{}': {}", path.display(), e))?;
+    files::search::index_file(&path);
+    Ok(path.to_string_lossy().into_owned())
+}
+
+fn resolve_new_markdown_path(name: &str, current: Option<&str>) -> Result<PathBuf, String> {
+    let name = name.trim().trim_end_matches(['/', '\\']);
+    if name.is_empty() || name == "." || name == ".." {
+        return Err("Name is empty".into());
+    }
+    if name.chars().any(|c| c == '\0') {
+        return Err("Invalid name".into());
+    }
+
+    let mut path = if let Some(rest) = name.strip_prefix("~/") {
+        dirs::home_dir()
+            .ok_or_else(|| "No home directory".to_string())?
+            .join(rest)
+    } else if name == "~" {
+        return Err("Name is empty".into());
+    } else {
+        let given = PathBuf::from(name);
+        if given.is_absolute() {
+            given
+        } else {
+            let base = current
+                .and_then(|path| Path::new(path).parent().map(Path::to_path_buf))
+                .or_else(dirs::home_dir)
+                .unwrap_or_else(|| PathBuf::from("."));
+            base.join(name)
+        }
+    };
+
+    if path.file_name().is_none() {
+        return Err("Name is empty".into());
+    }
+    if path.extension().is_none() {
+        path.set_extension("md");
+    }
+
+    Ok(path)
+}
+
+#[tauri::command]
 fn watch_file(watcher: tauri::State<Mutex<FileWatcher>>, path: String) -> Result<(), String> {
     watcher
         .lock()
@@ -135,6 +199,7 @@ pub fn run() {
             render_markdown,
             parse_file,
             splice_source,
+            create_markdown_file,
             add_file,
             files::search::start_live_fuzzy_search,
             files::search::cancel_fuzzy_search,

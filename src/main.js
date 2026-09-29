@@ -13,6 +13,9 @@ const closeBtn = document.getElementById("closeBtn");
 const themePopup = document.getElementById("themePopup");
 const themeInput = document.getElementById("themeInput");
 const themeResultsEl = document.getElementById("themeResults");
+const newFilePopup = document.getElementById("newFilePopup");
+const newFileInput = document.getElementById("newFileInput");
+const newFileError = document.getElementById("newFileError");
 const helpDashboard = document.getElementById("helpDashboard");
 const helpChip = document.getElementById("helpChip");
 
@@ -56,6 +59,44 @@ function closeThemePopup() {
   themeInput.blur();
 }
 
+function isNewFileOpen() {
+  return newFilePopup.style.display === "block";
+}
+
+function openNewFilePopup() {
+  closePopup();
+  closeThemePopup();
+  closeHelpDashboard();
+  newFileError.textContent = "";
+  newFileInput.value = "";
+  newFilePopup.style.display = "block";
+  newFileInput.focus();
+}
+
+function closeNewFilePopup() {
+  newFilePopup.style.display = "none";
+  newFileInput.value = "";
+  newFileError.textContent = "";
+  leaderActive = false;
+  newFileInput.blur();
+}
+
+async function submitNewFile() {
+  const name = newFileInput.value.trim();
+  if (!name) {
+    newFileError.textContent = "Type a name first";
+    return;
+  }
+  try {
+    const path = await invoke("create_markdown_file", { name });
+    closeNewFilePopup();
+    await parseFile(path);
+    editCursor();
+  } catch (error) {
+    newFileError.textContent = error?.message || String(error);
+  }
+}
+
 function isHelpOpen() {
   return helpDashboard.style.display === "flex";
 }
@@ -63,6 +104,7 @@ function isHelpOpen() {
 function openHelpDashboard() {
   closePopup();
   closeThemePopup();
+  closeNewFilePopup();
   stopHintMode();
   helpDashboard.style.display = "flex";
   helpChip.setAttribute("aria-expanded", "true");
@@ -899,6 +941,23 @@ window.addEventListener("keydown", (e) => {
 });
 
 window.addEventListener("keydown", (e) => {
+  if (!isNewFileOpen()) return;
+
+  if (e.key === "Escape") {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    closeNewFilePopup();
+    return;
+  }
+
+  if (e.key === "Enter") {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    submitNewFile();
+  }
+});
+
+window.addEventListener("keydown", (e) => {
   if (themePopup.style.display !== "block") return;
 
   if (e.key === "Escape") {
@@ -1085,6 +1144,11 @@ window.addEventListener("DOMContentLoaded", () => {
         closeThemePopup();
         return;
       }
+      if (isNewFileOpen()) {
+        e.preventDefault();
+        closeNewFilePopup();
+        return;
+      }
       if (isHelpOpen()) {
         e.preventDefault();
         closeHelpDashboard();
@@ -1106,7 +1170,7 @@ window.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    if (searchPopup.style.display === "block" || themePopup.style.display === "block" || isHelpOpen()) {
+    if (searchPopup.style.display === "block" || themePopup.style.display === "block" || isNewFileOpen() || isHelpOpen()) {
       return;
     }
 
@@ -1199,6 +1263,8 @@ window.addEventListener("DOMContentLoaded", () => {
         openPopup();
       } else if (e.key.toLowerCase() === "t") {
         openThemePopup();
+      } else if (e.key.toLowerCase() === "n") {
+        openNewFilePopup();
       }
       leaderActive = false;
       clearTimeout(leaderTimeout);

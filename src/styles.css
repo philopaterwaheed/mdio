@@ -184,7 +184,8 @@ h1 {
 }
 
 #searchInput,
-#themeInput {
+#themeInput,
+#newFileInput {
   width: 100%;
   padding: 12px 16px;
   font-size: 18px;
@@ -197,16 +198,36 @@ h1 {
 }
 
 #searchInput::placeholder,
-#themeInput::placeholder {
+#themeInput::placeholder,
+#newFileInput::placeholder {
   color: var(--text-tertiary);
   opacity: 0.7;
 }
 
 #searchInput:focus,
-#themeInput:focus {
+#themeInput:focus,
+#newFileInput:focus {
   border-color: var(--accent-primary);
   box-shadow: 0 0 8px var(--accent-primary);
   background-color: var(--bg-hover);
+}
+
+.new-file-hint {
+  margin: 12px 0 0;
+  color: var(--text-muted);
+  font-size: 0.85em;
+  line-height: 1.45;
+}
+
+.new-file-hint code {
+  font-family: ui-monospace, "Courier New", Consolas, monospace;
+}
+
+.new-file-error {
+  margin: 8px 0 0;
+  min-height: 1.2em;
+  color: #f38ba8;
+  font-size: 0.85em;
 }
 
 
