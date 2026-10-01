@@ -695,6 +695,22 @@ function setCursor(startOrBlock) {
   el.scrollIntoView({ block: "nearest" });
 }
 
+function goToTop() {
+  const list = documentBlocks();
+  if (list.length > 0) {
+    setCursor(list[0]);
+  }
+  window.scrollTo({ top: 0 });
+}
+
+function goToEnd() {
+  const list = documentBlocks();
+  if (list.length > 0) {
+    setCursor(list[list.length - 1]);
+  }
+  window.scrollTo({ top: document.documentElement.scrollHeight });
+}
+
 function expandDeleteEnd(end) {
   let at = end;
   while (at < sourceBytes.length && (sourceBytes[at] === 10 || sourceBytes[at] === 13)) {
@@ -1518,20 +1534,14 @@ window.addEventListener("DOMContentLoaded", () => {
         insertAbove();
         return;
       }
-      if (e.key === "g") {
+      if (e.key === "g" || e.key === "Home") {
         e.preventDefault();
-        const list = documentBlocks();
-        if (list.length > 0) {
-          setCursor(list[0]);
-        }
+        goToTop();
         return;
       }
-      if (e.key === "G") {
+      if (e.key === "G" || e.key === "End") {
         e.preventDefault();
-        const list = documentBlocks();
-        if (list.length > 0) {
-          setCursor(list[list.length - 1]);
-        }
+        goToEnd();
         return;
       }
       if (e.key === "?") {
