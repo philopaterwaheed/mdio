@@ -605,17 +605,10 @@ function onEditorKeyDown(e) {
   e.stopPropagation();
 
   const { editor } = editorSession;
-  const isMulti = editor.value.includes("\n");
 
   if (e.key === "Escape") {
     e.preventDefault();
     cancelEditor();
-    return;
-  }
-
-  if (e.key === "Enter" && !e.shiftKey && !isMulti) {
-    e.preventDefault();
-    commitEditor();
     return;
   }
 

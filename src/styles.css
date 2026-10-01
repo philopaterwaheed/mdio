@@ -454,7 +454,6 @@ h1 {
 .md-block.md-cursor {
   outline: 2px solid var(--accent-primary);
   outline-offset: 4px;
-  background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
 }
 
 .md-empty-file {
