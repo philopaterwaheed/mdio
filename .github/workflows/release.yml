@@ -57,7 +57,7 @@ jobs:
         run: npm ci
 
       - name: generate app icons
-        run: npx tauri icon src/assets/tauri.svg
+        run: npx tauri icon src/assets/logo.svg
 
       - uses: tauri-apps/tauri-action@v1
         env:
