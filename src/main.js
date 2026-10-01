@@ -180,6 +180,8 @@ let cursorStart = null;
 let lastBlockStart = null;
 let hintState = null;
 let ignoreOutputClickUntil = 0;
+const UNDO_LIMIT = 100;
+let undoStack = [];
 
 const HINT_CHARS = "asdfghjklqwertyuiopzxcvbnm";
 
@@ -190,6 +192,56 @@ function setSource(source) {
 
 function utf8Slice(start, end) {
   return utf8dec.decode(sourceBytes.subarray(start, end));
+}
+
+function clearUndo() {
+  undoStack = [];
+}
+
+function pushUndo(start, oldText, newText) {
+  if (currentPath == null || oldText === newText) {
+    return;
+  }
+  undoStack.push({
+    path: currentPath,
+    start,
+    newBytes: utf8.encode(newText).length,
+    oldText,
+    cursorStart,
+    lastBlockStart,
+  });
+  if (undoStack.length > UNDO_LIMIT) {
+    undoStack.shift();
+  }
+}
+
+async function undoEdit() {
+  if (editorSession) {
+    return;
+  }
+  while (undoStack.length > 0 && undoStack[undoStack.length - 1].path !== currentPath) {
+    undoStack.pop();
+  }
+  if (undoStack.length === 0 || currentPath == null) {
+    return;
+  }
+  const edit = undoStack.pop();
+  try {
+    const payload = await invoke("splice_source", {
+      start: edit.start,
+      end: edit.start + edit.newBytes,
+      text: edit.oldText,
+    });
+    cursorStart = edit.cursorStart;
+    lastBlockStart = edit.lastBlockStart;
+    applyRendered(payload, true);
+  } catch (error) {
+    undoStack.push(edit);
+    outputEl.insertAdjacentHTML(
+      "afterbegin",
+      `<p style="color: red;">Error undoing: ${error}</p>`,
+    );
+  }
 }
 
 function isRemoteSrc(src) {
@@ -283,6 +335,7 @@ window.parseFile = async function (filePath, silent = false) {
       cursorStart = null;
       lastBlockStart = null;
     }
+    clearUndo();
     applyRendered(result, silent);
     if (!silent) {
       closeHelpDashboard();
@@ -849,6 +902,7 @@ async function commitEditor(nextStart = null) {
 
   editorSession = null;
   try {
+    pushUndo(start, original, text);
     const payload = await invoke("splice_source", { start, end, text });
     const delta = utf8.encode(text).length - (end - start);
     cursorStart = start;
@@ -1196,7 +1250,18 @@ window.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z") {
+      e.preventDefault();
+      undoEdit();
+      return;
+    }
+
     if (!leaderActive) {
+      if (e.key === "u") {
+        e.preventDefault();
+        undoEdit();
+        return;
+      }
       if (e.key === "f") {
         e.preventDefault();
         startHintMode();
