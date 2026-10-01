@@ -765,6 +765,152 @@ async function spliceOutRange(start, end) {
   }
 }
 
+function blockSource(block) {
+  const start = Number(block.dataset.start);
+  const end = Number(block.dataset.end);
+  if (Number.isNaN(start) || Number.isNaN(end) || start > end) {
+    return "";
+  }
+  return utf8Slice(start, end);
+}
+
+function extractFencedInner(md) {
+  const text = md.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const firstNl = text.indexOf("\n");
+  const first = firstNl === -1 ? text : text.slice(0, firstNl);
+  const fenceMatch = first.match(/^ {0,3}([`~]{3,})(.*)$/);
+  if (!fenceMatch) {
+    if (/^(?: {4}|\t)/m.test(text)) {
+      return text.replace(/^(?: {4}|\t)/gm, "").replace(/\n$/, "");
+    }
+    return text;
+  }
+  const mark = fenceMatch[1][0] === "~" ? "~" : "`";
+  const n = fenceMatch[1].length;
+  let rest = firstNl === -1 ? "" : text.slice(firstNl + 1);
+  const close = new RegExp(`\\n {0,3}${mark}{${n},}[ \\t]*$`);
+  if (close.test(rest)) {
+    return rest.replace(close, "");
+  }
+  return rest.replace(new RegExp(`^ {0,3}${mark}{${n},}[ \\t]*$`), "");
+}
+
+function extractQuoteInner(md) {
+  return md
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^ {0,3}> ?/, ""))
+    .join("\n");
+}
+
+function tableInner(block) {
+  const rows = [...block.querySelectorAll("tr")];
+  if (rows.length === 0) {
+    return blockSource(block);
+  }
+  return rows
+    .map((row) =>
+      [...row.querySelectorAll("th, td")]
+        .map((cell) => cell.textContent.replace(/\s+/g, " ").trim())
+        .join("\t"),
+    )
+    .join("\n");
+}
+
+function blockInner(block) {
+  const kind = block.dataset.kind || "";
+  const md = blockSource(block);
+  if (kind === "code") {
+    const fromMd = extractFencedInner(md);
+    if (fromMd !== md) {
+      return fromMd;
+    }
+    const codeEl = block.querySelector("pre code, code");
+    return codeEl ? codeEl.textContent.replace(/\n$/, "") : md;
+  }
+  if (kind === "quote") {
+    return extractQuoteInner(md);
+  }
+  if (kind === "table") {
+    return tableInner(block);
+  }
+  if (kind === "html") {
+    return md;
+  }
+  return md;
+}
+
+function copyUsesInner(block) {
+  const kind = block.dataset.kind;
+  return kind === "code" || kind === "quote" || kind === "table" || kind === "html";
+}
+
+async function writeClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      return document.execCommand("copy");
+    } finally {
+      ta.remove();
+    }
+  }
+}
+
+function showCopyFlash(label) {
+  let el = document.getElementById("mdCopyFlash");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "mdCopyFlash";
+    el.className = "md-copy-flash";
+    document.body.appendChild(el);
+  }
+  el.textContent = label;
+  el.classList.add("is-on");
+  clearTimeout(showCopyFlash.timer);
+  showCopyFlash.timer = setTimeout(() => {
+    el.classList.remove("is-on");
+  }, 900);
+}
+
+async function copyBlock(block, mode) {
+  if (!block || block.classList.contains("md-empty-file")) {
+    return;
+  }
+  const source = blockSource(block);
+  const inner = mode === "source" ? source : blockInner(block);
+  const text = inner;
+  if (text === "") {
+    return;
+  }
+  const ok = await writeClipboard(text);
+  if (!ok) {
+    return;
+  }
+  const usedInner = mode !== "source" && copyUsesInner(block) && inner !== source;
+  showCopyFlash(usedInner ? "copied inner" : "copied");
+}
+
+function copyCurrentBlock(mode) {
+  const block = currentBlock();
+  if (!block) {
+    return;
+  }
+  copyBlock(block, mode);
+}
+
+function hasTextSelection() {
+  const sel = window.getSelection();
+  return Boolean(sel && String(sel));
+}
+
 function moveCursor(delta) {
   const list = documentBlocks();
   if (list.length === 0) {
@@ -1319,6 +1465,15 @@ window.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "c") {
+      if (hasTextSelection() || !outputEl.querySelector(".md-block.md-cursor")) {
+        return;
+      }
+      e.preventDefault();
+      copyCurrentBlock("inner");
+      return;
+    }
+
     if (!leaderActive) {
       if (e.key === "u") {
         e.preventDefault();
@@ -1328,6 +1483,16 @@ window.addEventListener("DOMContentLoaded", () => {
       if (e.key === "d") {
         e.preventDefault();
         deleteCurrentBlock();
+        return;
+      }
+      if (e.key === "y") {
+        e.preventDefault();
+        copyCurrentBlock("inner");
+        return;
+      }
+      if (e.key === "Y") {
+        e.preventDefault();
+        copyCurrentBlock("source");
         return;
       }
       if (e.key === "f") {

@@ -129,6 +129,28 @@ h1 {
   border: 1px solid var(--border-primary);
 }
 
+.md-copy-flash {
+  position: fixed;
+  bottom: 62px;
+  left: 50%;
+  transform: translateX(-50%) translateY(8px);
+  z-index: 950;
+  padding: 4px 10px;
+  border: 1px solid var(--border-secondary);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font: 600 12px ui-monospace, "Courier New", Consolas, monospace;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.md-copy-flash.is-on {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
 .output pre code {
   background: none;
   padding: 0;
