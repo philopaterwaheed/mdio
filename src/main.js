@@ -702,6 +702,69 @@ function setCursor(startOrBlock) {
   el.scrollIntoView({ block: "nearest" });
 }
 
+function expandDeleteEnd(end) {
+  let at = end;
+  while (at < sourceBytes.length && (sourceBytes[at] === 10 || sourceBytes[at] === 13)) {
+    at += 1;
+  }
+  return at;
+}
+
+async function deleteCurrentBlock() {
+  if (!currentPath) {
+    return;
+  }
+  if (editorSession) {
+    if (editorSession.inserting) {
+      cancelEditor();
+      return;
+    }
+    const { start, end, editor } = editorSession;
+    editorSession = null;
+    editor.remove();
+    await spliceOutRange(start, end);
+    return;
+  }
+  const block = currentBlock();
+  if (!block || block.classList.contains("md-empty-file")) {
+    return;
+  }
+  const start = Number(block.dataset.start);
+  const end = Number(block.dataset.end);
+  if (Number.isNaN(start) || Number.isNaN(end) || start > end) {
+    return;
+  }
+  await spliceOutRange(start, end);
+}
+
+async function spliceOutRange(start, end) {
+  const delEnd = expandDeleteEnd(end);
+  const original = utf8Slice(start, delEnd);
+  if (original === "") {
+    return;
+  }
+  try {
+    pushUndo(start, original, "");
+    const payload = await invoke("splice_source", {
+      start,
+      end: delEnd,
+      text: "",
+    });
+    cursorStart = start;
+    lastBlockStart = start;
+    applyRendered(payload, true);
+    const restore = nearestBlock(start) || documentBlocks().at(-1);
+    if (restore) {
+      setCursor(restore);
+    }
+  } catch (error) {
+    outputEl.insertAdjacentHTML(
+      "afterbegin",
+      `<p style="color: red;">Error deleting: ${error}</p>`,
+    );
+  }
+}
+
 function moveCursor(delta) {
   const list = documentBlocks();
   if (list.length === 0) {
@@ -1260,6 +1323,11 @@ window.addEventListener("DOMContentLoaded", () => {
       if (e.key === "u") {
         e.preventDefault();
         undoEdit();
+        return;
+      }
+      if (e.key === "d") {
+        e.preventDefault();
+        deleteCurrentBlock();
         return;
       }
       if (e.key === "f") {
