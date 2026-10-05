@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::Duration;
 use tauri::Manager;
+use tauri_plugin_dialog::DialogExt;
 
 #[tauri::command]
 fn render_markdown(markdown: String) -> String {
@@ -62,6 +63,36 @@ fn parse_file(
         source,
         path,
     })
+}
+
+#[tauri::command]
+async fn pick_markdown_file(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, CurruntFile>,
+) -> Result<Option<String>, String> {
+    let mut dialog = app
+        .dialog()
+        .file()
+        .set_title("Open markdown file")
+        .add_filter("Markdown", &["md", "markdown", "mdown", "txt"]);
+
+    if let Ok(doc) = state.doc.lock() {
+        if let Some(path) = doc.path.as_deref() {
+            if let Some(parent) = Path::new(path).parent() {
+                if !parent.as_os_str().is_empty() {
+                    dialog = dialog.set_directory(parent);
+                }
+            }
+        }
+    }
+
+    match dialog.blocking_pick_file() {
+        None => Ok(None),
+        Some(file) => {
+            let path = file.into_path().map_err(|e| e.to_string())?;
+            Ok(Some(path.to_string_lossy().into_owned()))
+        }
+    }
 }
 
 #[tauri::command]
@@ -195,9 +226,11 @@ fn atomic_write(path: &str, contents: &str) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             render_markdown,
             parse_file,
+            pick_markdown_file,
             splice_source,
             create_markdown_file,
             add_file,

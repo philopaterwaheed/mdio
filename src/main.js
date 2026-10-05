@@ -115,6 +115,43 @@ function closeHelpDashboard() {
   helpChip.setAttribute("aria-expanded", "false");
 }
 
+async function openFromFilesystem() {
+  try {
+    const path = await invoke("pick_markdown_file");
+    if (!path) {
+      return;
+    }
+    await parseFile(path);
+  } catch (error) {
+    outputEl.insertAdjacentHTML(
+      "afterbegin",
+      `<p style="color: red;">Error opening: ${error}</p>`,
+    );
+  }
+}
+
+function beginLeader() {
+  leaderActive = true;
+  leaderTimeout = setTimeout(() => {
+    leaderActive = false;
+  }, 1000);
+}
+
+function handleLeaderKey(key) {
+  const k = key.toLowerCase();
+  if (k === "f") {
+    openPopup();
+  } else if (k === "t") {
+    openThemePopup();
+  } else if (k === "n") {
+    openNewFilePopup();
+  } else if (k === "o") {
+    openFromFilesystem();
+  }
+  leaderActive = false;
+  clearTimeout(leaderTimeout);
+}
+
 function toggleHelpDashboard() {
   if (isHelpOpen()) {
     closeHelpDashboard();
@@ -1444,7 +1481,29 @@ window.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    if (searchPopup.style.display === "block" || themePopup.style.display === "block" || isNewFileOpen() || isHelpOpen()) {
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "o") {
+      if (editorSession || e.target.closest("input, textarea")) {
+        return;
+      }
+      e.preventDefault();
+      openFromFilesystem();
+      return;
+    }
+
+    if (searchPopup.style.display === "block" || themePopup.style.display === "block" || isNewFileOpen()) {
+      return;
+    }
+
+    if (isHelpOpen()) {
+      if (!leaderActive && e.key === " ") {
+        e.preventDefault();
+        beginLeader();
+        return;
+      }
+      if (leaderActive) {
+        e.preventDefault();
+        handleLeaderKey(e.key);
+      }
       return;
     }
 
@@ -1552,25 +1611,14 @@ window.addEventListener("DOMContentLoaded", () => {
     }
 
     if (!leaderActive && e.key === " ") {
-      leaderActive = true;
-      leaderTimeout = setTimeout(() => {
-        leaderActive = false;
-      }, 1000);
+      beginLeader();
       e.preventDefault(); // prevent scrolling
       return;
     }
 
     if (leaderActive) {
       e.preventDefault(); // prevent this key from typing in input
-      if (e.key.toLowerCase() === "f") {
-        openPopup();
-      } else if (e.key.toLowerCase() === "t") {
-        openThemePopup();
-      } else if (e.key.toLowerCase() === "n") {
-        openNewFilePopup();
-      }
-      leaderActive = false;
-      clearTimeout(leaderTimeout);
+      handleLeaderKey(e.key);
     }
   });
 });
