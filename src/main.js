@@ -142,9 +142,21 @@ async function openFileInfo() {
   closeHelpDashboard();
   fileInfoList.replaceChildren();
   fileInfoPopup.style.display = "block";
+  let notesHome = "";
+  try {
+    notesHome = await invoke("get_home_dir");
+  } catch {
+    notesHome = "";
+  }
   if (!currentPath) {
-    fileInfoEmpty.hidden = false;
-    fileInfoList.hidden = true;
+    if (notesHome) {
+      fileInfoEmpty.hidden = true;
+      fileInfoList.hidden = false;
+      fileInfoList.replaceChildren(infoRow("notes folder", notesHome));
+    } else {
+      fileInfoEmpty.hidden = false;
+      fileInfoList.hidden = true;
+    }
     return;
   }
   fileInfoEmpty.hidden = true;
@@ -166,6 +178,7 @@ async function openFileInfo() {
       infoRow("name", disk.name || currentPath.split(/[/\\]/).pop() || currentPath),
       infoRow("path", disk.path),
       infoRow("folder", disk.directory || "—"),
+      infoRow("notes folder", notesHome || "—"),
       infoRow("on disk", `${disk.bytes} B (${formatBytes(disk.bytes)})`),
       infoRow("modified", formatWhen(disk.modifiedMs)),
       infoRow("created", formatWhen(disk.createdMs)),
@@ -230,6 +243,21 @@ async function openFromFilesystem() {
   }
 }
 
+async function pickHomeDir() {
+  try {
+    const path = await invoke("pick_home_dir");
+    if (!path) {
+      return;
+    }
+    showCopyFlash(path);
+  } catch (error) {
+    outputEl.insertAdjacentHTML(
+      "afterbegin",
+      `<p style="color: red;">Error setting notes folder: ${error}</p>`,
+    );
+  }
+}
+
 function beginLeader() {
   leaderActive = true;
   leaderTimeout = setTimeout(() => {
@@ -249,6 +277,8 @@ function handleLeaderKey(key) {
     openFromFilesystem();
   } else if (k === "i") {
     openFileInfo();
+  } else if (k === "h") {
+    pickHomeDir();
   }
   leaderActive = false;
   clearTimeout(leaderTimeout);

@@ -24,7 +24,29 @@ static INDEX_BUILD: Mutex<()> = Mutex::new(());
 
 struct FileIndex {
     extension: String,
+    root: PathBuf,
     files: Arc<Vec<(String, String)>>,
+}
+
+static SEARCH_ROOT: Mutex<Option<PathBuf>> = Mutex::new(None);
+
+pub fn search_root() -> PathBuf {
+    SEARCH_ROOT
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone()
+        .or_else(dirs::home_dir)
+        .unwrap_or_else(|| PathBuf::from("/"))
+}
+
+pub fn init_search_root(path: PathBuf) {
+    *SEARCH_ROOT.lock().unwrap_or_else(|e| e.into_inner()) = Some(path);
+}
+
+pub fn set_search_root(path: PathBuf) {
+    init_search_root(path);
+    SEARCH_GEN.fetch_add(1, Ordering::Relaxed);
+    *INDEX.lock().unwrap_or_else(|e| e.into_inner()) = None;
 }
 
 #[tauri::command]
@@ -39,8 +61,8 @@ pub fn warmup_index(extension: &str) {
         if cached_index(&extension).is_some() {
             return;
         }
-        let files = collect_files(&extension, &|| false);
-        store_index(extension, files);
+        let (root, files) = collect_files(&extension, &|| false);
+        store_index(extension, root, files);
     });
 }
 
@@ -73,7 +95,7 @@ pub async fn start_live_fuzzy_search(app: AppHandle, extension: String, query: S
             .checked_sub(EMIT_INTERVAL)
             .unwrap_or_else(Instant::now);
 
-        collect_files_with(&extension, &is_cancelled, |name, path| {
+        let root = collect_files_with(&extension, &is_cancelled, |name, path| {
             indexed.push((name.clone(), path.clone()));
             if let Some(score) = matcher.fuzzy_match(&name, &query) {
                 if insert_result(
@@ -95,7 +117,7 @@ pub async fn start_live_fuzzy_search(app: AppHandle, extension: String, query: S
             return;
         }
 
-        store_index(extension, indexed);
+        store_index(extension, root, indexed);
         emit_snapshot(&app, &top_results);
         let _ = app.emit("live_fuzzy_done", {});
     });
@@ -155,15 +177,20 @@ fn emit_snapshot(app: &AppHandle, heap: &BinaryHeap<SearchResult>) {
 
 fn cached_index(extension: &str) -> Option<Arc<Vec<(String, String)>>> {
     let index = INDEX.lock().unwrap_or_else(|e| e.into_inner());
+    let root = search_root();
     index.as_ref().and_then(|index| {
-        (index.extension == extension).then(|| Arc::clone(&index.files))
+        (index.extension == extension && index.root == root).then(|| Arc::clone(&index.files))
     })
 }
 
-fn store_index(extension: String, files: Vec<(String, String)>) {
+fn store_index(extension: String, root: PathBuf, files: Vec<(String, String)>) {
+    if search_root() != root {
+        return;
+    }
     let mut index = INDEX.lock().unwrap_or_else(|e| e.into_inner());
     *index = Some(FileIndex {
         extension,
+        root,
         files: Arc::new(files),
     });
 }
@@ -190,23 +217,23 @@ pub fn index_file(path: &std::path::Path) {
     }
 }
 
-fn collect_files(extension: &str, is_cancelled: &dyn Fn() -> bool) -> Vec<(String, String)> {
+fn collect_files(extension: &str, is_cancelled: &dyn Fn() -> bool) -> (PathBuf, Vec<(String, String)>) {
     let mut files = Vec::new();
-    collect_files_with(extension, is_cancelled, |name, path| {
+    let root = collect_files_with(extension, is_cancelled, |name, path| {
         files.push((name, path));
     });
-    files
+    (root, files)
 }
 
 fn collect_files_with(
     extension: &str,
     is_cancelled: &dyn Fn() -> bool,
     mut on_file: impl FnMut(String, String),
-) {
-    let root = dirs::home_dir().unwrap_or_else(|| PathBuf::from("/"));
+) -> PathBuf {
+    let root = search_root();
     let ext = OsStr::new(extension);
 
-    for entry in WalkDir::new(root)
+    for entry in WalkDir::new(&root)
         .follow_links(false)
         .into_iter()
         .filter_entry(|entry| {
@@ -215,7 +242,7 @@ fn collect_files_with(
         .filter_map(Result::ok)
     {
         if is_cancelled() {
-            return;
+            return root;
         }
         if !entry.file_type().is_file() {
             continue;
@@ -231,6 +258,7 @@ fn collect_files_with(
             path.to_string_lossy().into_owned(),
         );
     }
+    root
 }
 
 fn should_skip_dir(name: &OsStr) -> bool {

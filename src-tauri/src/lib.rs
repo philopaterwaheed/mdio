@@ -201,9 +201,7 @@ fn resolve_new_markdown_path(name: &str, current: Option<&str>) -> Result<PathBu
     }
 
     let mut path = if let Some(rest) = name.strip_prefix("~/") {
-        dirs::home_dir()
-            .ok_or_else(|| "No home directory".to_string())?
-            .join(rest)
+        files::search::search_root().join(rest)
     } else if name == "~" {
         return Err("Name is empty".into());
     } else {
@@ -213,8 +211,7 @@ fn resolve_new_markdown_path(name: &str, current: Option<&str>) -> Result<PathBu
         } else {
             let base = current
                 .and_then(|path| Path::new(path).parent().map(Path::to_path_buf))
-                .or_else(dirs::home_dir)
-                .unwrap_or_else(|| PathBuf::from("."));
+                .unwrap_or_else(files::search::search_root);
             base.join(name)
         }
     };
@@ -227,6 +224,62 @@ fn resolve_new_markdown_path(name: &str, current: Option<&str>) -> Result<PathBu
     }
 
     Ok(path)
+}
+
+fn home_config_file(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    Ok(dir.join("notes-home"))
+}
+
+fn load_saved_home(app: &tauri::AppHandle) -> PathBuf {
+    if let Ok(file) = home_config_file(app) {
+        if let Ok(text) = fs::read_to_string(file) {
+            let path = PathBuf::from(text.trim());
+            if path.is_dir() {
+                return path;
+            }
+        }
+    }
+    dirs::home_dir().unwrap_or_else(|| PathBuf::from("/"))
+}
+
+fn save_home_dir(app: &tauri::AppHandle, path: &Path) -> Result<(), String> {
+    let file = home_config_file(app)?;
+    if let Some(parent) = file.parent() {
+        fs::create_dir_all(parent).map_err(|e| {
+            format!("Failed to save notes folder: {}", e)
+        })?;
+    }
+    fs::write(&file, path.to_string_lossy().as_bytes()).map_err(|e| {
+        format!("Failed to save notes folder: {}", e)
+    })
+}
+
+#[tauri::command]
+fn get_home_dir() -> String {
+    files::search::search_root().to_string_lossy().into_owned()
+}
+
+#[tauri::command]
+async fn pick_home_dir(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    let mut dialog = app
+        .dialog()
+        .file()
+        .set_title("Choose notes folder");
+    dialog = dialog.set_directory(files::search::search_root());
+    match dialog.blocking_pick_folder() {
+        None => Ok(None),
+        Some(folder) => {
+            let path = folder.into_path().map_err(|e| e.to_string())?;
+            if !path.is_dir() {
+                return Err("Not a folder".into());
+            }
+            save_home_dir(&app, &path)?;
+            files::search::set_search_root(path.clone());
+            files::search::warmup_index("md");
+            Ok(Some(path.to_string_lossy().into_owned()))
+        }
+    }
 }
 
 #[tauri::command]
@@ -266,6 +319,8 @@ pub fn run() {
             parse_file,
             pick_markdown_file,
             file_info,
+            get_home_dir,
+            pick_home_dir,
             splice_source,
             create_markdown_file,
             add_file,
@@ -279,6 +334,7 @@ pub fn run() {
         .setup(|app| {
             let watcher = FileWatcher::new(app.handle().clone())?;
             app.manage(Mutex::new(watcher));
+            files::search::init_search_root(load_saved_home(app.handle()));
             files::search::warmup_index("md");
 
             let args: Vec<String> = std::env::args().collect();
