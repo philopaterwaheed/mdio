@@ -28,6 +28,12 @@
 	  <p id="newFileError" class="new-file-error"></p>
      </div>
 
+     <div id="fileInfoPopup" class="popup file-info-popup">
+       <h2 class="file-info-title">file</h2>
+       <p id="fileInfoEmpty" class="file-info-empty">No file is open</p>
+       <dl id="fileInfoList" class="file-info-list" hidden></dl>
+     </div>
+
      <div id="helpDashboard" class="help-dashboard" role="dialog" aria-labelledby="helpTitle">
        <div class="help-panel">
          <header class="help-header">
@@ -51,6 +57,7 @@
                <div><dt><kbd>Space</kbd> <kbd>n</kbd></dt><dd>create a new markdown file</dd></div>
                <div><dt><kbd>↑</kbd> <kbd>↓</kbd> <kbd>Enter</kbd></dt><dd>pick a search result</dd></div>
                <div><dt><kbd>Space</kbd> <kbd>t</kbd></dt><dd>switch theme</dd></div>
+               <div><dt><kbd>Space</kbd> <kbd>i</kbd></dt><dd>show file info</dd></div>
                <div><dt><kbd>?</kbd></dt><dd>this dashboard</dd></div>
              </dl>
            </section>

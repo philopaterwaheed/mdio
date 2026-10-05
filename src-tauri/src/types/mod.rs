@@ -70,6 +70,18 @@ pub struct RenderedFile {
     pub path: String,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileDiskInfo {
+    pub path: String,
+    pub name: String,
+    pub directory: String,
+    pub bytes: u64,
+    pub modified_ms: Option<i64>,
+    pub created_ms: Option<i64>,
+    pub readonly: bool,
+}
+
 pub struct WatcherState {
     pub current_path: Arc<Mutex<Option<String>>>,
 }

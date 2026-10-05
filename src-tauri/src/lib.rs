@@ -3,11 +3,11 @@ mod files;
 mod types;
 
 use files::notify::FileWatcher;
-use types::{CurruntFile, FileState, RenderedFile};
+use types::{CurruntFile, FileDiskInfo, FileState, RenderedFile};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 
@@ -93,6 +93,40 @@ async fn pick_markdown_file(
             Ok(Some(path.to_string_lossy().into_owned()))
         }
     }
+}
+
+fn time_ms(t: SystemTime) -> Option<i64> {
+    t.duration_since(UNIX_EPOCH)
+        .ok()
+        .and_then(|d| i64::try_from(d.as_millis()).ok())
+}
+
+#[tauri::command]
+fn file_info(state: tauri::State<CurruntFile>) -> Result<FileDiskInfo, String> {
+    let path = state
+        .doc
+        .lock()
+        .map_err(|e| e.to_string())?
+        .path
+        .clone()
+        .ok_or_else(|| "No file is open".to_string())?;
+    let meta = fs::metadata(&path).map_err(|e| format!("Failed to stat '{}': {}", path, e))?;
+    let p = Path::new(&path);
+    Ok(FileDiskInfo {
+        name: p
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default(),
+        directory: p
+            .parent()
+            .map(|d| d.to_string_lossy().into_owned())
+            .unwrap_or_default(),
+        bytes: meta.len(),
+        modified_ms: meta.modified().ok().and_then(time_ms),
+        created_ms: meta.created().ok().and_then(time_ms),
+        readonly: meta.permissions().readonly(),
+        path,
+    })
 }
 
 #[tauri::command]
@@ -231,6 +265,7 @@ pub fn run() {
             render_markdown,
             parse_file,
             pick_markdown_file,
+            file_info,
             splice_source,
             create_markdown_file,
             add_file,

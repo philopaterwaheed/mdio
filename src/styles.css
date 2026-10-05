@@ -252,6 +252,53 @@ h1 {
   font-size: 0.85em;
 }
 
+.file-info-popup {
+  width: min(560px, 92vw);
+}
+
+.file-info-title {
+  margin: 0 0 12px;
+  font-size: 0.85em;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  color: var(--accent-border);
+  text-align: left;
+}
+
+.file-info-empty {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.file-info-list {
+  margin: 0;
+}
+
+.file-info-list div {
+  display: flex;
+  gap: 16px;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-top: 1px solid var(--border-primary);
+}
+
+.file-info-list dt {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: 0.85em;
+}
+
+.file-info-list dd {
+  margin: 0;
+  flex: 1 1 auto;
+  text-align: right;
+  color: var(--text-primary);
+  font-family: ui-monospace, "Courier New", Consolas, monospace;
+  font-size: 0.85em;
+  word-break: break-all;
+}
+
 
 .box {
   border: 1px solid var(--border-primary);

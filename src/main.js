@@ -18,6 +18,9 @@ const newFileInput = document.getElementById("newFileInput");
 const newFileError = document.getElementById("newFileError");
 const helpDashboard = document.getElementById("helpDashboard");
 const helpChip = document.getElementById("helpChip");
+const fileInfoPopup = document.getElementById("fileInfoPopup");
+const fileInfoEmpty = document.getElementById("fileInfoEmpty");
+const fileInfoList = document.getElementById("fileInfoList");
 
 let leaderActive = false;
 let leaderTimeout;
@@ -28,6 +31,7 @@ let themeResults = [];
 let themeSelectedIndex = -1;
 
 function openPopup() {
+  closeFileInfo();
   searchPopup.style.display = "block";
   searchInput.focus();
 }
@@ -44,6 +48,7 @@ window.closePopup = function () {
 }
 
 function openThemePopup() {
+  closeFileInfo();
   themePopup.style.display = "block";
   themeInput.focus();
   renderThemes("");
@@ -67,6 +72,7 @@ function openNewFilePopup() {
   closePopup();
   closeThemePopup();
   closeHelpDashboard();
+  closeFileInfo();
   newFileError.textContent = "";
   newFileInput.value = "";
   newFilePopup.style.display = "block";
@@ -79,6 +85,99 @@ function closeNewFilePopup() {
   newFileError.textContent = "";
   leaderActive = false;
   newFileInput.blur();
+}
+
+function isFileInfoOpen() {
+  return fileInfoPopup.style.display === "block";
+}
+
+function closeFileInfo() {
+  fileInfoPopup.style.display = "none";
+  leaderActive = false;
+}
+
+function formatBytes(n) {
+  if (n < 1024) {
+    return `${n} B`;
+  }
+  const units = ["KB", "MB", "GB"];
+  let x = n / 1024;
+  let u = 0;
+  while (x >= 1024 && u < units.length - 1) {
+    x /= 1024;
+    u += 1;
+  }
+  return `${x < 10 ? x.toFixed(1) : Math.round(x)} ${units[u]}`;
+}
+
+function formatWhen(ms) {
+  if (ms == null) {
+    return "—";
+  }
+  return new Date(ms).toLocaleString();
+}
+
+function countWords(text) {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return 0;
+  }
+  return trimmed.split(/\s+/).length;
+}
+
+function infoRow(label, value) {
+  const div = document.createElement("div");
+  const dt = document.createElement("dt");
+  const dd = document.createElement("dd");
+  dt.textContent = label;
+  dd.textContent = value;
+  div.append(dt, dd);
+  return div;
+}
+
+async function openFileInfo() {
+  closePopup();
+  closeThemePopup();
+  closeNewFilePopup();
+  closeHelpDashboard();
+  fileInfoList.replaceChildren();
+  fileInfoPopup.style.display = "block";
+  if (!currentPath) {
+    fileInfoEmpty.hidden = false;
+    fileInfoList.hidden = true;
+    return;
+  }
+  fileInfoEmpty.hidden = true;
+  fileInfoList.hidden = false;
+  const source = currentSource ?? "";
+  const lines = source === "" ? 0 : source.split(/\r\n|\r|\n/).length;
+  fileInfoList.append(
+    infoRow("name", currentPath.split(/[/\\]/).pop() || currentPath),
+    infoRow("path", currentPath),
+    infoRow("blocks", String(documentBlocks().length)),
+    infoRow("lines", String(lines)),
+    infoRow("words", String(countWords(source))),
+    infoRow("characters", String(source.length)),
+    infoRow("bytes", `${sourceBytes.length} (${formatBytes(sourceBytes.length)})`),
+  );
+  try {
+    const disk = await invoke("file_info");
+    fileInfoList.replaceChildren(
+      infoRow("name", disk.name || currentPath.split(/[/\\]/).pop() || currentPath),
+      infoRow("path", disk.path),
+      infoRow("folder", disk.directory || "—"),
+      infoRow("on disk", `${disk.bytes} B (${formatBytes(disk.bytes)})`),
+      infoRow("modified", formatWhen(disk.modifiedMs)),
+      infoRow("created", formatWhen(disk.createdMs)),
+      infoRow("writable", disk.readonly ? "no" : "yes"),
+      infoRow("blocks", String(documentBlocks().length)),
+      infoRow("lines", String(lines)),
+      infoRow("words", String(countWords(source))),
+      infoRow("characters", String(source.length)),
+    );
+  } catch (error) {
+    fileInfoList.append(infoRow("disk", error?.message || String(error)));
+  }
 }
 
 async function submitNewFile() {
@@ -105,6 +204,7 @@ function openHelpDashboard() {
   closePopup();
   closeThemePopup();
   closeNewFilePopup();
+  closeFileInfo();
   stopHintMode();
   helpDashboard.style.display = "flex";
   helpChip.setAttribute("aria-expanded", "true");
@@ -147,6 +247,8 @@ function handleLeaderKey(key) {
     openNewFilePopup();
   } else if (k === "o") {
     openFromFilesystem();
+  } else if (k === "i") {
+    openFileInfo();
   }
   leaderActive = false;
   clearTimeout(leaderTimeout);
@@ -1460,6 +1562,11 @@ window.addEventListener("DOMContentLoaded", () => {
         closeNewFilePopup();
         return;
       }
+      if (isFileInfoOpen()) {
+        e.preventDefault();
+        closeFileInfo();
+        return;
+      }
       if (isHelpOpen()) {
         e.preventDefault();
         closeHelpDashboard();
@@ -1490,7 +1597,7 @@ window.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    if (searchPopup.style.display === "block" || themePopup.style.display === "block" || isNewFileOpen()) {
+    if (searchPopup.style.display === "block" || themePopup.style.display === "block" || isNewFileOpen() || isFileInfoOpen()) {
       return;
     }
 
