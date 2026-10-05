@@ -746,6 +746,42 @@ h1 {
   font-size: 0.85em;
 }
 
+.help-links {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-primary);
+}
+
+.help-by {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9em;
+}
+
+.help-links nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.help-links a {
+  color: var(--accent-primary);
+  text-decoration: none;
+  font-size: 0.9em;
+}
+
+.help-links a:hover,
+.help-links a:focus-visible {
+  color: var(--accent-hover);
+  text-decoration: underline;
+  outline: none;
+}
+
 .help-dashboard kbd {
   display: inline-block;
   padding: 1px 6px;

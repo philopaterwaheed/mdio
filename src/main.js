@@ -2,6 +2,7 @@ import { themes, applyTheme, loadSavedTheme, getCurrentTheme } from './themes/th
 
 const { listen } = window.__TAURI__.event;
 const { invoke, convertFileSrc } = window.__TAURI__.core;
+const { openUrl } = window.__TAURI__.opener;
 
 let outputEl;
 let searchResultsEl = document.getElementById("searchResults");
@@ -1569,6 +1570,12 @@ window.addEventListener("DOMContentLoaded", () => {
     toggleHelpDashboard();
   });
   helpDashboard.addEventListener("click", (e) => {
+    const link = e.target.closest("a[href]");
+    if (link) {
+      e.preventDefault();
+      openUrl(link.href);
+      return;
+    }
     if (e.target === helpDashboard) {
       closeHelpDashboard();
     }
