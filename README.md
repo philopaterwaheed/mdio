@@ -88,7 +88,7 @@ Grab a build from [Releases](https://github.com/philopaterwaheed/mdio/releases).
 | Platform | What to download |
 | --- | --- |
 | **Windows** | `*-setup.exe` — NSIS installer. The other `.exe` is portable (needs WebView2, already on Windows 11). |
-| **Linux** | `.AppImage`, `.deb`, or `.rpm` |
+| **Linux** | `.AppImage`, `.deb`, `.rpm`, or the unbundled `--release` binary `mdio-*-linux-x86_64` (needs WebKitGTK). |
 | **macOS** | `.dmg` / `.app` (Intel and Apple Silicon) |
 
 From source:

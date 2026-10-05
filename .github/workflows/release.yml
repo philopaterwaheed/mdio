@@ -70,7 +70,7 @@ jobs:
             - `*-setup.exe` — NSIS installer
             - `*.exe` without `-setup` — portable executable (needs WebView2, included on Windows 11)
 
-            **Linux** — `.AppImage`, `.deb`, `.rpm`
+            **Linux** — `.AppImage`, `.deb`, `.rpm`, and the unbundled `--release` binary (needs WebKitGTK)
             **macOS** — `.dmg` / `.app`
           releaseDraft: false
           prerelease: false
@@ -79,3 +79,33 @@ jobs:
           uploadPlainBinary: ${{ matrix.portable }}
           releaseAssetNamePattern: "[name]-[version]-[platform]-[arch][setup].[ext]"
           args: ${{ matrix.args }}
+
+      - name: upload Linux release executable
+        if: matrix.platform == 'ubuntu-22.04'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            tag="${GITHUB_REF_NAME}"
+            version="${tag#v}"
+          else
+            tag="v${version}"
+          fi
+          src=""
+          for candidate in src-tauri/target/release/mdio target/release/mdio; do
+            if [[ -f "$candidate" ]]; then
+              src="$candidate"
+              break
+            fi
+          done
+          if [[ -z "$src" ]]; then
+            echo "could not find target/release/mdio"
+            find . -path '*/target/release/mdio' -type f || true
+            exit 1
+          fi
+          asset="mdio-${version}-linux-x86_64"
+          cp "$src" "$asset"
+          chmod +x "$asset"
+          gh release upload "$tag" "$asset" --clobber
